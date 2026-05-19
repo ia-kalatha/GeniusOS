@@ -1,6 +1,6 @@
 {
-  "name": "DevGenius",
-  "description": "Plataforma de Engenharia de Hardware e Software - V12 Kernel",
+  "name": "DEVGENIUS",
+  "description": "Hub completo de hardware e software para makers: placas, componentes, projetos e IA Gemini integrada.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

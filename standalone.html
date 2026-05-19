@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GENIUS V12 — Ultimate Tech Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide-react"></script>
+    <script src="https://unpkg.com/motion/dist/motion.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a0a;
+            color: #f5f5f5;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        .glass {
+            background: rgba(23, 23, 23, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .shadow-glow {
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.15);
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .animate-shimmer {
+            animation: shimmer 2s infinite;
+        }
+
+        .gradient-text {
+            background: linear-gradient(to right, #06b6d4, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { 
+            LogOut, Cpu, Box, Layout, MessageSquare, Code, Terminal, 
+            Search, Plus, Layers, Info, CheckCircle2, ChevronRight, Send,
+            Loader2, AlertCircle, Sparkles, X, Filter, Lock, Mail, 
+            User: UserIcon, Calendar, ArrowRight, ShieldCheck
+        } = lucide;
+
+        // --- DATA ---
+        const DATA_PLACAS = [
+            { id: "p1", nome: "Arduino Uno R3", tipo: "Básica", info: "O padrão ouro para iniciantes. ATmega328P, estável e robusto.", image: "https://images.unsplash.com/photo-1553406830-ef2513450d76?q=80&w=800" },
+            { id: "p2", nome: "Arduino Mega 2560", tipo: "Básica", info: "54 pinos digitais para projetos massivos de automação.", image: "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800" },
+            { id: "p3", nome: "Arduino Nano V3", tipo: "Básica", info: "Pequeno e potente. Ideal para breadboards.", image: "https://images.unsplash.com/photo-1603732551681-2e91159b9dc2?q=80&w=800" },
+            { id: "p4", nome: "ESP32 DevKit V1", tipo: "Especial", info: "WiFi e Bluetooth Dual-Core. O rei do IoT moderno.", image: "https://images.unsplash.com/photo-1551703599-6b3e8379aa2c?q=80&w=800" },
+            { id: "p5", nome: "Raspberry Pi Pico", tipo: "Básica", info: "Chip RP2040 com PIO programável de alta performance.", image: "https://images.unsplash.com/photo-1591405351990-4726e331f141?q=80&w=800" },
+            { id: "p6", nome: "NodeMCU ESP8266", tipo: "Especial", info: "Conectividade WiFi simplificada para domótica.", image: "https://images.unsplash.com/photo-1551703599-6b3e8379aa23?q=80&w=800" },
+            { id: "p7", nome: "Arduino Leonardo", tipo: "Básica", info: "Suporte USB nativo. Emula teclado e mouse (HID).", image: "https://images.unsplash.com/photo-1553406830-ef2513450d76?q=80&w=800" },
+            { id: "p8", nome: "Arduino Due", tipo: "Avançado", info: "Processador ARM de 32 bits para cálculos complexos.", image: "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800" },
+            { id: "p9", nome: "STM32 Blue Pill", tipo: "Especial", info: "Cortex-M3. Barato e muito mais rápido que o Uno.", image: "https://images.unsplash.com/photo-1553406830-ef2513450d76?q=80&w=800" },
+            { id: "p10", nome: "BeagleBone Black", tipo: "Avançado", info: "Computador industrial com PRUs de tempo real.", image: "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800" },
+            { id: "p11", nome: "Teensy 4.1", tipo: "Avançado", info: "Frequência de 600MHz. O microcontrolador mais rápido.", image: "https://images.unsplash.com/photo-1603732551681-2e91159b9dc2?q=80&w=800" },
+            { id: "p12", nome: "Arduino Pro Mini", tipo: "Básica", info: "Versão minúscula sem USB para integração final.", image: "https://images.unsplash.com/photo-1603732551681-2e91159b9dc2?q=80&w=800" },
+            { id: "p13", nome: "ESP32-CAM Pro", tipo: "Especial", info: "ESP32 com módulo de câmera para visão computacional.", image: "https://images.unsplash.com/photo-1551703599-6b3e8379aa2c?q=80&w=800" },
+            { id: "p14", nome: "Arduino MKR1010", tipo: "Especial", info: "Focado em IoT com criptografia e baixo consumo.", image: "https://images.unsplash.com/photo-1553406830-ef2513450d76?q=80&w=800" },
+            { id: "p15", nome: "Raspberry Pi Zero 2W", tipo: "Avançado", info: "Computador completo minúsculo com WiFi e Bluetooth.", image: "https://images.unsplash.com/photo-1591405351990-4726e331f141?q=80&w=800" },
+            { id: "p16", nome: "Orange Pi Zero 2", tipo: "Avançado", info: "Alternativa potente para servidores locais.", image: "https://images.unsplash.com/photo-1591405351990-4726e331f141?q=80&w=800" },
+            { id: "p17", nome: "Arduino Micro HID", tipo: "Básica", info: "Versão compacta do Leonardo com ATmega32u4.", image: "https://images.unsplash.com/photo-1603732551681-2e91159b9dc2?q=80&w=800" },
+            { id: "p18", nome: "ESP-01 WiFi Tiny", tipo: "Especial", info: "Módulo WiFi minúsculo para mini sensores.", image: "https://images.unsplash.com/photo-1551703599-6b3e8379aa23?q=80&w=800" },
+            { id: "p19", nome: "Seeeduino Xiao", tipo: "Básica", info: "Microcontrolador SAMD21 extremamente pequeno.", image: "https://images.unsplash.com/photo-1603732551681-2e91159b9dc2?q=80&w=800" },
+            { id: "p20", nome: "Particle Boron LTE", tipo: "Especial", info: "Microcontrolador com celular/LTE integrado.", image: "https://images.unsplash.com/photo-1551703599-6b3e8379aa2c?q=80&w=800" },
+            { id: "p21", nome: "Arduino Portenta", tipo: "Avançado", info: "Dual-core, industrial, rodando código de IA.", image: "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800" },
+            { id: "p22", nome: "Wemos D1 Mini V3", tipo: "Especial", info: "ESP8266 compacto com pinagem prática.", image: "https://images.unsplash.com/photo-1551703599-6b3e8379aa23?q=80&w=800" },
+            { id: "p23", nome: "Adafruit Feather", tipo: "Avançado", info: "Focado em bateria e portabilidade extrema.", image: "https://images.unsplash.com/photo-1603732551681-2e91159b9dc2?q=80&w=800" },
+            { id: "p24", nome: "Arduino Every", tipo: "Básica", info: "Evolução do Nano com ATMega4809.", image: "https://images.unsplash.com/photo-1603732551681-2e91159b9dc2?q=80&w=800" },
+            { id: "p25", nome: "NVIDIA Jetson", tipo: "Avançado", info: "Desenvolvido para IA e Deep Learning.", image: "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800" }
+        ];
+
+        const NORMAL_NAMES = [
+            "Resistor 220R", "Resistor 1k", "Resistor 10k", "Capacitor 100nF", "Capacitor 10uF",
+            "LED Vermelho", "LED Verde", "LED Azul", "Botão Push", "Potenciômetro 10k",
+            "Diodo 1N4007", "Transistor BC547", "Transistor BC557", "Buzzer Ativo", "Buzzer Passivo",
+            "Relé 5V", "Sensor LDR", "Termistor NTC", "Display 7 Seg", "Tilt Switch",
+            "Chave Gangorra", "Trimpot 10k", "Diodo Zener", "Foto-transistor", "Barra de Pinos",
+            "Jack P4", "Suporte 9V", "Jumpers M-M", "Breadboard 830", "Chave DIP",
+            "LED RGB", "Sensor Toque", "Receptor IR", "Emissor IR", "Microfone Electret",
+            "Joystick", "Motor DC", "Hélice", "Reed Switch", "LED UV",
+            "Porta Pilha", "Diodo Laser", "Opto 4N35", "CI Inversor", "CI Port AND",
+            "CI Timer 555", "Soquete CI", "Sensor Som", "Relé Estado Sólido", "Pot. Digital"
+        ];
+
+        const ADVANCED_NAMES = [
+            "DHT22 High Prec", "Ultrassônico SR04", "OLED 0.96 I2C", "RTC DS3231", "SD Card Module",
+            "RFID RC522", "MPU6050 Accel", "LCD 16x2 I2C", "Servo MG90S", "GPS Neo-6M",
+            "BMP280 Barom", "Encoder Rot", "MP3 DFPlayer", "Sensor UV", "Sensor Cor",
+            "WiFi ESP-01S", "HC-05 BT", "MAX7219 Matriz", "Driver L298N", "Passo Nema 17",
+            "Bomba 5V", "Válvula Solenoide", "Sensor Gás MQ", "GSM SIM800L", "LoRa 433MHz",
+            "ADS1115 ADC", "PCA9685 PWM", "Sensor Pulso", "Célula Carga", "HX711 Amp",
+            "Sensor Flex", "Microfone MEMS", "Sensor Ph", "Keypad 4x4", "NeoPixel Ring",
+            "Laser ToF", "Chuva Pro", "ESP32 Camera", "Rastreador Linha", "E-Ink Display",
+            "CAN Bus", "Turbidez", "Rádio FM DSP", "TFT 3.5 Touch", "Sensor Força",
+            "Ethernet ENC", "Peltier TEC1", "Inversor CC/CA", "Bússola Dig", "Bio Fingerprint"
+        ];
+
+        const DATA_COMPONENTES = [
+            ...NORMAL_NAMES.map((nome, i) => ({
+                id: `cN${i + 1}`,
+                nome: nome,
+                tipo: "Normal",
+                info: "Elemento essencial para circuitos eletrônicos profissionais.",
+                image: "https://images.unsplash.com/photo-1555664424-778a1e5e1b48?q=80&w=800"
+            })),
+            ...ADVANCED_NAMES.map((nome, i) => ({
+                id: `cA${i + 1}`,
+                nome: nome,
+                tipo: "Avançado",
+                info: "Tecnologia de ponta para aplicações de automação complexa.",
+                image: "https://images.unsplash.com/photo-1558444479-c840f952f7f9?q=80&w=800"
+            }))
+        ];
+
+        // --- COMPONENTS ---
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const saved = localStorage.getItem("genius_user");
+                if (saved) setUser(JSON.parse(saved));
+                setLoading(false);
+            }, []);
+
+            const handleLogin = (u) => {
+                setUser(u);
+                localStorage.setItem("genius_user", JSON.stringify(u));
+            };
+
+            const handleLogout = () => {
+                setUser(null);
+                localStorage.removeItem("genius_user");
+            };
+
+            if (loading) return (
+                <div className="h-screen bg-black flex items-center justify-center">
+                    <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            );
+
+            return (
+                <div>
+                    {!user ? <AuthPage onLogin={handleLogin} /> : <Dashboard user={user} onLogout={handleLogout} />}
+                </div>
+            );
+        }
+
+        function AuthPage({ onLogin }) {
+            const [mode, setMode] = useState("login");
+            const [form, setForm] = useState({ username: "", password: "", email: "", firstName: "", lastName: "" });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                // Simulation
+                onLogin({ ...form, firstName: form.firstName || form.username });
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-black px-4">
+                    <div className="w-full max-w-md space-y-8">
+                        <div className="text-center">
+                            <div className="w-20 h-20 bg-cyan-500/10 border border-cyan-500/30 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                                <Cpu className="w-10 h-10 text-cyan-400" />
+                            </div>
+                            <h1 className="text-4xl font-extrabold tracking-tighter transition-all">GENIUS <span className="text-cyan-400">V12</span></h1>
+                            <p className="text-neutral-500 mt-2 uppercase tracking-widest text-[10px] font-bold">Hardware AI Neural Core</p>
+                        </div>
+
+                        <div className="glass p-10 rounded-[2.5rem] shadow-glow">
+                             <h2 className="text-xl font-bold mb-8 uppercase tracking-tight">
+                                {mode === "login" ? "Acessar Sistema" : "Identidade Digital"}
+                             </h2>
+                             <form onSubmit={handleSubmit} className="space-y-5">
+                                {mode === "register" && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <input placeholder="Nome" onChange={e => setForm({...form, firstName: e.target.value})} className="bg-black/50 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500/50" required />
+                                        <input placeholder="Sobrenome" onChange={e => setForm({...form, lastName: e.target.value})} className="bg-black/50 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500/50" />
+                                    </div>
+                                )}
+                                <div className="space-y-4">
+                                    <div className="relative">
+                                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
+                                        <input placeholder="E-mail ou Usuário" onChange={e => setForm({...form, username: e.target.value})} className="w-full bg-black/50 border border-white/5 rounded-2xl pl-14 pr-5 py-4 text-sm focus:outline-none focus:border-cyan-500/50" required />
+                                    </div>
+                                    <div className="relative">
+                                        <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
+                                        <input type="password" placeholder="Chave de Acesso" onChange={e => setForm({...form, password: e.target.value})} className="w-full bg-black/50 border border-white/5 rounded-2xl pl-14 pr-5 py-4 text-sm focus:outline-none focus:border-cyan-500/50" required />
+                                    </div>
+                                </div>
+                                <button className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black py-5 rounded-2xl mt-4 transition-all active:scale-95 shadow-xl flex items-center justify-center gap-3">
+                                    {mode === "login" ? "INICIAR CONEXÃO" : "GERAR REGISTRO"} <ArrowRight className="w-4 h-4" />
+                                </button>
+                             </form>
+
+                             <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                                <button onClick={() => setMode(mode === "login" ? "register" : "login")} className="text-xs font-bold text-neutral-500 hover:text-cyan-400 transition-colors">
+                                    {mode === "login" ? "Não possui registro? Cadastre-se" : "Já é um membro? Retornar ao login"}
+                                </button>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function Dashboard({ user, onLogout }) {
+            const [tab, setTab] = useState("placas");
+            const [basket, setBasket] = useState([]);
+            const [selectedPlaca, setSelectedPlaca] = useState(null);
+            const [modal, setModal] = useState(null);
+
+            const addToWorkspace = (item) => {
+                if (tab === "placas") {
+                    setSelectedPlaca(item);
+                } else {
+                    if (basket.length < 5) setBasket([...basket, item]);
+                }
+            };
+
+            return (
+                <div className="flex flex-col lg:flex-row min-h-screen bg-black">
+                    {/* Lateral Nav */}
+                    <aside className="w-full lg:w-80 border-r border-white/5 p-8 flex flex-col gap-10 glass lg:sticky lg:top-0 h-auto lg:h-screen z-50">
+                        <div className="flex items-center gap-4">
+                             <div className="w-12 h-12 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center justify-center">
+                                <Cpu className="w-6 h-6 text-cyan-400" />
+                             </div>
+                             <span className="text-2xl font-black tracking-tighter">GENIUS <span className="text-cyan-400">V12</span></span>
+                        </div>
+
+                        <nav className="space-y-2 flex-1">
+                            <NavItem icon={Box} label="Controladoras" active={tab === "placas"} onClick={() => setTab("placas")} />
+                            <NavItem icon={Layers} label="Componentes" active={tab === "componentes"} onClick={() => setTab("componentes")} />
+                            <NavItem icon={Layout} label="Laboratório" active={tab === "workspace"} onClick={() => setTab("workspace")} dot={basket.length + (selectedPlaca?1:0)} />
+                            <NavItem icon={MessageSquare} label="Genius AI" active={tab === "ia"} onClick={() => setTab("ia")} />
+                        </nav>
+
+                        <div className="pt-8 border-t border-white/5 space-y-4">
+                             <div className="flex items-center gap-4 p-4 bg-white/5 rounded-3xl">
+                                <div className="w-10 h-10 bg-black border border-white/10 rounded-xl flex items-center justify-center font-bold text-cyan-400 uppercase">{user.firstName[0]}</div>
+                                <div className="overflow-hidden">
+                                     <p className="text-sm font-bold truncate">Eng. {user.firstName}</p>
+                                     <p className="text-[10px] text-neutral-600 uppercase font-black">Sessão Ativa</p>
+                                </div>
+                             </div>
+                             <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 text-neutral-600 hover:text-red-500 text-[10px] font-black uppercase py-4 rounded-2xl transition-all">
+                                <LogOut className="w-3 h-3" /> Encerrar Núcleo
+                             </button>
+                        </div>
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="flex-1 p-8 lg:p-14 overflow-y-auto relative">
+                        <header className="mb-14 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                             <div>
+                                <h2 className="text-5xl font-black tracking-tighter uppercase mb-2">{tab}</h2>
+                                <p className="text-neutral-500 uppercase tracking-[0.3em] font-bold text-[10px]">Bios v12.4.0 // Hardware Ecosystem</p>
+                             </div>
+                             <div className="flex gap-4">
+                                <div className="relative group">
+                                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600 group-focus-within:text-cyan-400" />
+                                    <input placeholder="Pesquisar..." className="bg-white/5 border border-white/5 rounded-2xl pl-14 pr-6 py-4 text-sm font-bold w-full md:w-64 focus:outline-none focus:border-cyan-500/50 transition-all shadow-inner" />
+                                </div>
+                             </div>
+                        </header>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-8">
+                            {(tab === "placas" || tab === "componentes") && 
+                                (tab === "placas" ? DATA_PLACAS : DATA_COMPONENTES).map(item => (
+                                    <HardwareCard 
+                                        key={item.id} 
+                                        item={item} 
+                                        onAdd={() => addToWorkspace(item)} 
+                                        onView={() => setModal(item)}
+                                        isAdded={selectedPlaca?.id === item.id || basket.find(b => b.id === item.id)}
+                                    />
+                                ))
+                            }
+                        </div>
+
+                        {tab === "workspace" && <WorkspaceView placa={selectedPlaca} components={basket} onClear={() => {setBasket([]); setSelectedPlaca(null);}} />}
+                        {tab === "ia" && <IAPanel />}
+                    </main>
+
+                    {/* Modal */}
+                    {modal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md" onClick={() => setModal(null)}>
+                            <div className="bg-neutral-900 border border-white/10 rounded-[3rem] max-w-4xl w-full p-10 lg:p-16 relative shadow-2xl flex flex-col md:flex-row gap-12" onClick={e => e.stopPropagation()}>
+                                <button onClick={() => setModal(null)} className="absolute top-8 right-8 w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center hover:bg-white/10"><X className="w-5 h-5"/></button>
+                                <img src={modal.image} className="w-full md:w-80 aspect-square object-cover rounded-3xl shadow-glow" />
+                                <div className="flex-1 space-y-6">
+                                     <span className="px-4 py-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded-full text-[10px] font-black text-cyan-400 uppercase">{modal.tipo}</span>
+                                     <h3 className="text-4xl font-black">{modal.nome}</h3>
+                                     <p className="text-neutral-400 leading-relaxed text-lg">{modal.info}</p>
+                                     <button onClick={() => {addToWorkspace(modal); setModal(null);}} className="w-full bg-white text-black font-black py-5 rounded-2xl hover:bg-cyan-400 transition-all flex items-center justify-center gap-3">
+                                        <Plus className="w-5 h-5"/> ADICIONAR AO PROJETO
+                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function NavItem({ icon: Icon, label, active, onClick, dot }) {
+            return (
+                <button onClick={onClick} className={`w-full flex items-center gap-4 px-6 py-5 rounded-2xl transition-all relative ${active ? "bg-cyan-500 text-black shadow-glow font-black" : "text-neutral-500 hover:text-white"}`}>
+                    <Icon className="w-5 h-5" />
+                    <span className="text-sm font-bold tracking-tight">{label}</span>
+                    {dot > 0 && <span className={`ml-auto w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${active ? "bg-black text-cyan-400" : "bg-cyan-500 text-black"}`}>{dot}</span>}
+                </button>
+            );
+        }
+
+        function HardwareCard({ item, onAdd, onView, isAdded }) {
+            return (
+                <div className="group glass p-6 rounded-[2.5rem] flex flex-col hover:border-cyan-500/30 transition-all hover:bg-neutral-900 shadow-xl">
+                    <div className="relative aspect-square rounded-3xl overflow-hidden mb-6 bg-black border border-white/5">
+                         <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-80 group-hover:opacity-100" />
+                         <div className="absolute top-4 left-4">
+                            <div className="bg-black/80 px-4 py-1.5 rounded-full text-[9px] font-black text-cyan-500 uppercase tracking-widest border border-white/10">{item.tipo}</div>
+                         </div>
+                    </div>
+                    <h4 className="text-xl font-black uppercase mb-3 truncate group-hover:text-cyan-400 transition-colors">{item.nome}</h4>
+                    <p className="text-[11px] text-neutral-500 leading-relaxed mb-8 flex-1 line-clamp-3 uppercase tracking-wide opacity-60 font-bold">{item.info}</p>
+                    <div className="flex gap-3">
+                         <button onClick={onAdd} className={`flex-1 h-14 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all ${isAdded ? "bg-green-500/10 text-green-500" : "bg-white/5 hover:bg-white hover:text-black"}`}>
+                            {isAdded ? <CheckCircle2 className="w-4 h-4"/> : <Plus className="w-4 h-4"/>} {isAdded ? "Mapeado" : "Laboratório"}
+                         </button>
+                         <button onClick={onView} className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center hover:bg-white/10"><Info className="w-4 h-4"/></button>
+                    </div>
+                </div>
+            );
+        }
+
+        function WorkspaceView({ placa, components, onClear }) {
+            const [simulating, setSimulating] = useState(false);
+            const [report, setReport] = useState(null);
+
+            const handleCompile = () => {
+                if(!placa || components.length === 0) return alert("Selecione os hardwares!");
+                setSimulating(true);
+                setTimeout(() => {
+                    setSimulating(false);
+                    setReport(`# PROJETO COMPILADO: NEXUS CORE\n\nEste setup utiliza o **${placa.nome}** como unidade central de processamento.\n\n### MATERIAIS\n- 1x ${placa.nome}\n${components.map(c => `- 1x ${c.nome}`).join('\n')}\n\n### LIGAÇÕES RECOMENDADAS\nConecte os periféricos nos pinos digitais I2C e PWM conforme o diagrama simulado.\n\n### CÓDIGO FONTE\n\`\`\`cpp\nvoid setup() {\n  Serial.begin(9600);\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(1000);\n}\n\`\`\``);
+                }, 2000);
+            };
+
+            return (
+                <div className="max-w-6xl mx-auto space-y-16 pb-40">
+                    <div className="text-center space-y-4">
+                        <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.4em]">Simulação de Engenharia</span>
+                        <h2 className="text-6xl font-black tracking-tighter uppercase">Compilador de Projetos</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                        <div className="glass p-12 rounded-[4rem] text-center space-y-8 flex flex-col items-center">
+                            <p className="text-[10px] font-black uppercase text-neutral-600">Núcleo Principal</p>
+                            <div className="w-full aspect-square bg-black border border-white/5 rounded-[3rem] flex items-center justify-center shadow-inner relative overflow-hidden group">
+                                {placa ? <img src={placa.image} className="w-64 h-64 object-contain drop-shadow-glow" /> : <Cpu className="w-24 h-24 opacity-10" />}
+                                {placa && <div className="absolute bottom-8 text-xl font-black uppercase">{placa.nome}</div>}
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between px-4">
+                                <span className="text-[10px] font-black uppercase text-neutral-600">Barramento ({components.length}/5)</span>
+                                <button onClick={onClear} className="text-[10px] font-black text-red-500 uppercase">Limpar Tudo</button>
+                            </div>
+                            <div className="space-y-4">
+                                {components.map(c => (
+                                    <div key={c.id} className="glass p-5 rounded-3xl flex items-center gap-6">
+                                        <img src={c.image} className="w-12 h-12 rounded-xl object-cover" />
+                                        <div className="flex-1 font-black uppercase text-sm">{c.nome}</div>
+                                        <Plus className="w-5 h-5 text-neutral-800 rotate-45" />
+                                    </div>
+                                ))}
+                                {components.length === 0 && <div className="border border-white/5 border-dashed rounded-[3rem] p-24 text-center text-neutral-700 uppercase font-black text-xs opacity-40">Aguardando Componentes...</div>}
+                            </div>
+
+                            <button onClick={handleCompile} disabled={simulating} className="w-full bg-white text-black h-20 rounded-[2.5rem] font-black uppercase shadow-2xl flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-95 transition-all">
+                                {simulating ? <Loader2 className="w-6 h-6 animate-spin"/> : "Gerar Esquemático IA"} <ChevronRight className="w-5 h-5"/>
+                            </button>
+                        </div>
+                    </div>
+
+                    {report && (
+                         <div className="glass p-16 rounded-[4rem] prose prose-invert max-w-none">
+                            <pre className="whitespace-pre-wrap font-sans text-neutral-300 text-lg leading-relaxed">{report}</pre>
+                            <div className="mt-14 pt-8 border-t border-white/10 flex justify-between">
+                                <span className="text-[10px] font-black uppercase text-neutral-600 italic">Genius IA v12 // Relatório de Hardware</span>
+                                <button className="text-[10px] font-black uppercase text-cyan-400" onClick={() => window.print()}>Exportar PDF</button>
+                            </div>
+                         </div>
+                    )}
+                </div>
+            );
+        }
+
+        function IAPanel() {
+            const [msgs, setMsgs] = useState([]);
+            const [input, setInput] = useState("");
+            const [thinking, setThinking] = useState(false);
+
+            const send = () => {
+                if(!input.trim()) return;
+                const m = input;
+                setInput("");
+                setMsgs([...msgs, {role:'u', c: m}]);
+                setThinking(true);
+                setTimeout(() => {
+                    setMsgs(prev => [...prev, {role:'ia', c: `Como sua Inteligência Artificial assistente, analisei sua dúvida sobre "${m}". \n\nEm hardware, é importante verificar os níveis de tensão e a pinagem correta nos componentes. O Genius V12 recomenda sempre usar resistores de 220 ohms para LEDs comuns e garantir que o GND seja compartilhado.`}]);
+                    setThinking(false);
+                }, 1500);
+            };
+
+            return (
+                <div className="glass rounded-[4rem] h-[75vh] flex flex-col overflow-hidden max-w-5xl mx-auto shadow-2xl border-white/10">
+                    <div className="p-8 border-b border-white/5 flex items-center gap-6 bg-black/40">
+                         <div className="w-12 h-12 bg-cyan-500/10 rounded-2xl flex items-center justify-center"><MessageSquare className="w-6 h-6 text-cyan-400" /></div>
+                         <div>
+                            <h3 className="font-black text-xl uppercase tracking-tighter">Núcleo Central Genius</h3>
+                            <p className="text-[10px] font-black text-green-500 uppercase tracking-widest animate-pulse">Sincronizado // Online</p>
+                         </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-10 space-y-8">
+                        {msgs.length === 0 && (
+                            <div className="h-full flex flex-col items-center justify-center opacity-20 gap-6 text-center">
+                                <Sparkles className="w-20 h-20" />
+                                <p className="font-extrabold uppercase tracking-widest text-lg max-w-xs">Pergunte qualquer coisa sobre eletrônica e código.</p>
+                            </div>
+                        )}
+                        {msgs.map((m, i) => (
+                            <div key={i} className={`flex ${m.role === 'u' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[80%] p-8 rounded-[2.5rem] font-bold text-sm leading-relaxed ${m.role === 'u' ? 'bg-white text-black' : 'bg-neutral-800 text-neutral-300'}`}>
+                                    {m.c}
+                                </div>
+                            </div>
+                        ))}
+                        {thinking && <div className="flex justify-start"><div className="bg-neutral-800/40 p-6 rounded-3xl text-xs font-black uppercase text-neutral-600 animate-pulse">Processando dados...</div></div>}
+                    </div>
+
+                    <div className="p-8 bg-black/60 border-t border-white/5">
+                        <div className="relative">
+                            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Escreva sua dúvida técnica..." className="w-full bg-neutral-900 border border-white/10 rounded-[2rem] px-8 py-6 text-sm font-bold focus:outline-none focus:border-cyan-500/50" />
+                            <button onClick={send} className="absolute right-3 top-1/2 -translate-y-1/2 w-14 h-14 bg-cyan-500 rounded-2xl text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl"><Send className="w-5 h-5"/></button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

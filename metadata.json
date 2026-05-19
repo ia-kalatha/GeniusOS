@@ -1,0 +1,8 @@
+{
+  "name": "DevGenius",
+  "description": "Plataforma de Engenharia de Hardware e Software - V12 Kernel",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

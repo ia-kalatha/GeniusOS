@@ -9,10 +9,10 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build:client": "vite build",
-    "build:server": "esbuild server.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=dist/server.cjs",
+    "build:server": "esbuild server.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=server.cjs",
     "build": "npm run build:client && npm run build:server",
-    "start": "cross-env NODE_ENV=production node dist/server.cjs",
-    "clean": "rm -rf dist",
+    "start": "cross-env NODE_ENV=production node server.cjs",
+    "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

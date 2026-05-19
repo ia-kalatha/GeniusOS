@@ -35,8 +35,8 @@ npm run dev
 ```bash
 npm run build
 # Gera:
-#   dist/index.html + dist/assets/...   (frontend)
-#   dist/server.cjs                     (Express bundled)
+#   dist/index.html + dist/assets/...   (frontend estático)
+#   server.cjs                          (Express bundled na raiz)
 ```
 
 Teste localmente o build de produção:
@@ -79,9 +79,11 @@ public_html/
 2. Clique em **Criar aplicação** e preencha:
    - **Versão do Node.js:** `22.x`
    - **Modo de aplicação:** `Production`
+   - **Framework:** `Express`
    - **Raiz da aplicação:** caminho da pasta do projeto (ex.: `public_html`)
    - **URL da aplicação:** seu domínio (ex.: `seudominio.com`)
-   - **Arquivo de inicialização:** `dist/server.cjs`
+   - **Arquivo de inicialização:** `server.js`
+     *(o projeto já inclui um shim `server.js` que carrega o bundle `server.cjs`. Se o painel permitir alterar, você também pode apontar direto para `server.cjs`.)*
 3. Clique em **Criar**.
 
 ### 4.3. Variáveis de ambiente
@@ -115,7 +117,8 @@ Teste o chat IA e o gerador de esquemáticos para validar a chave Gemini.
 
 | Sintoma | Causa / correção |
 |---------|-------------------|
-| `Cannot find module 'dist/server.cjs'` | Você esqueceu `npm run build` no servidor. |
+| `Cannot find module 'server.cjs'` ou `Cannot find module 'dist/server.cjs'` | Você esqueceu `npm run build` no servidor — o bundle Express só existe após o build. |
+| Painel diz que o entry file é `server.js` e a app não sobe | É esperado: o shim `server.js` na raiz já carrega `server.cjs` automaticamente. Garanta que `npm run build` foi executado para gerar `server.cjs`. |
 | Chat IA responde "configure GEMINI_API_KEY" | A variável não foi definida no painel Node.js. Adicione e reinicie. |
 | Página em branco / 404 ao recarregar rota interna | O `server.ts` trata o fallback SPA. Verifique se o build gerou `dist/index.html`. |
 | Porta ocupada localmente | `PORT=4000 npm run dev` |
@@ -127,7 +130,8 @@ Teste o chat IA e o gerador de esquemáticos para validar a chave Gemini.
 
 ```
 .
-├── server.ts                 # Express (API IA + estáticos do build)
+├── server.ts                 # Express (API IA + estáticos do build) — fonte
+├── server.js                 # Shim ESM que carrega o bundle server.cjs (entry para Hostinger)
 ├── src/                      # React app
 │   ├── App.tsx
 │   ├── components/

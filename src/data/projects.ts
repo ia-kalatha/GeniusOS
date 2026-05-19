@@ -46,7 +46,7 @@ void loop() {
       { title: "Fiação", description: "Conecte o catodo ao GND e o anodo ao pino 13." },
       { title: "Upload", description: "Configure a placa Arduino Uno e faça o upload." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/led-blink.jpg"
   },
   {
     id: "p2",
@@ -86,7 +86,7 @@ void loop() {
       { title: "Calibração", description: "Ajuste o THRESHOLD monitorando o Serial Plotter." },
       { title: "Teste", description: "Toque no pino GPIO4 para disparar." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/esp32-buzzer.jpg"
   },
 
   // --- 3 COMPONENTES ---
@@ -126,7 +126,7 @@ void loop() {
       { title: "Bibliotecas", description: "Instale 'OneWire' e 'DallasTemperature'." },
       { title: "Monitoramento", description: "Abra o monitor serial em 9600 baud." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/termometro-dht.jpg"
   },
   {
     id: "p4",
@@ -155,7 +155,7 @@ void loop() {
       { title: "Saída PWM", description: "Certifique-se de usar pins com o símbolo '~' (como o 9)." },
       { title: "Teste", description: "Gire o eixo e observe a suavidade do brilho." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/potenciometro-led.jpg"
   },
 
   // --- 4 COMPONENTES ---
@@ -201,7 +201,7 @@ void loop() {
       { title: "Display", description: "Use a biblioteca TM1637 para facilitar a escrita." },
       { title: "Fator de Conversão", description: "A velocidade do som no ar é aprox. 340m/s." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/medidor-distancia.jpg"
   },
   {
     id: "p6",
@@ -241,7 +241,7 @@ void loop() {
       { title: "Relé", description: "Cuidado ao manipular tensões AC no relé." },
       { title: "Finalização", description: "HaltA limpa o estado da tag para nova leitura." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/rfid-fechadura.jpg"
   },
 
   // --- 5 COMPONENTES ---
@@ -279,7 +279,7 @@ void loop() {
       { title: "Fiação e Sensores", description: "Conecte os sensores infravermelhos na parte frontal e ligue-os à ponte H e ao Arduino." },
       { title: "Calibração e Teste", description: "Ajuste a sensibilidade dos sensores e teste a lógica de curva sobre a pista." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/robo-seguidor.jpg"
   },
   {
     id: "p8",
@@ -318,7 +318,7 @@ void loop() {
       { title: "OLED Setup", description: "Confirme o endereço I2C (geralmente 0x3C ou 0x3D)." },
       { title: "Buffer", description: "Sempre chame display.display() para atualizar a tela." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/estacao-meteorologica.jpg"
   },
 
   // --- 6+ COMPONENTES ---
@@ -351,7 +351,7 @@ void loop() {
       { title: "Conexão dos Servos", description: "Ligue os servos ao Arduino (usando alimentação externa se possível)." },
       { title: "Controle por Joystick", description: "Conecte os joysticks e mapeie os eixos analógicos para os ângulos dos servos." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/braco-robotico.jpg"
   },
   {
     id: "p10",
@@ -388,6 +388,6 @@ void loop() {
       { title: "PIR", description: "Aguarde o tempo de estabilização do PIR ao iniciar." },
       { title: "MP3", description: "Prepare o cartão SD com a pasta 'mp3' e arquivos renomeados." }
     ],
-    image: "https://http2.mlstatic.com/D_NQ_NP_2X_633566-MLA99983751151_112025-F.webp"
+    image: "/img/projetos/smart-home.jpg"
   }
 ];

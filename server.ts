@@ -356,15 +356,21 @@ app.post("/api/ai-schematic", aiLimiter, async (req, res) => {
 
 async function startServer() {
   const distPath = path.join(process.cwd(), "dist");
-  const hasDist = fs.existsSync(path.join(distPath, "index.html"));
 
-  if (process.env.NODE_ENV !== "production" && !hasDist) {
+  // Em dev sempre usamos Vite middleware (HMR + source ao vivo).
+  // Só servimos dist/ estático em produção — caso contrário, um dist/ stale
+  // gerado em um build local mascara mudanças em src/ silenciosamente.
+  if (!isProd) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
+    if (!fs.existsSync(path.join(distPath, "index.html"))) {
+      console.error("❌ Produção sem build: dist/index.html não existe. Rode `npm run build` antes de iniciar.");
+      process.exit(1);
+    }
     app.use(express.static(distPath));
     app.get("*", (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));

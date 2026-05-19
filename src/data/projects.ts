@@ -7,7 +7,7 @@ export interface Project {
   id: string;
   title: string;
   description: string;
-  difficulty: "Básico" | "Fácil" | "Intermediário" | "Avançado" | "Supremacy";
+  difficulty: "Básico" | "Intermediário" | "Avançado" | "Expert";
   compCount: number;
   components: string[];
   connections: string;
@@ -26,7 +26,7 @@ export const PROJECTS: Project[] = [
     compCount: 2,
     components: ["Arduino Uno", "LED Vermelho Difuso 5mm"],
     connections: "- LED: Anodo (longo) -> D13\n- LED: Catodo (curto) -> GND (via resistor 220R)",
-    code: `/* GENIUS V12 - EMERGENCY BEACON */
+    code: `/* DEVGENIUS - EMERGENCY BEACON */
 void setup() {
   pinMode(13, OUTPUT); // Define pino 13 como saída
 }
@@ -56,7 +56,7 @@ void loop() {
     compCount: 2,
     components: ["ESP32", "Buzzer Passivo"],
     connections: "- Buzzer Positivo -> D5\n- Buzzer Negativo -> GND",
-    code: `/* GENIUS V12 - TOUCH ALARM */
+    code: `/* DEVGENIUS - TOUCH ALARM */
 const int TOUCH_PIN = T0; // GPIO4
 const int BUZZER_PIN = 5;
 const int THRESHOLD = 30;
@@ -94,7 +94,7 @@ void loop() {
     id: "p3",
     title: "Termômetro Digital Simples",
     description: "Lê a temperatura ambiente e exibe no monitor serial com alerta visual.",
-    difficulty: "Fácil",
+    difficulty: "Básico",
     compCount: 3,
     components: ["Arduino Uno", "Sensor de Temperatura DS18B20", "LED Azul Difuso 5mm"],
     connections: "- DS18B20: Data -> D2, VCC -> 5V, GND -> GND\n- Pull-up: Resistor 4.7k entre Data e VCC\n- LED: D13 -> GND",
@@ -132,11 +132,11 @@ void loop() {
     id: "p4",
     title: "Controle de Brilho via Potenciômetro",
     description: "Ajuste a intensidade de um LED utilizando a entrada analógica e saída PWM.",
-    difficulty: "Fácil",
+    difficulty: "Básico",
     compCount: 3,
     components: ["Arduino Uno", "Potenciômetro Rotativo 10k", "LED Amarelo Difuso 5mm"],
     connections: "- Potenciômetro: Pinos laterais -> 5V e GND, Central -> A0\n- LED: Anodo -> D9 (PWM), Catodo -> GND",
-    code: `/* GENIUS V12 - PWM DIMMER */
+    code: `/* DEVGENIUS - PWM DIMMER */
 const int potPin = A0;
 const int ledPin = 9;
 
@@ -253,7 +253,7 @@ void loop() {
     compCount: 5,
     components: ["Arduino Uno", "Chassis Robótico 2 Rodas", "Módulo Driver Ponte H L298N", "2x Módulo Seguidor de Linha IR"],
     connections: "- Sensores IR: Out -> D2 (Esq) e D3 (Dir)\n- Motor E: IN1(D4), IN2(D5)\n- Motor D: IN3(D6), IN4(D7)",
-    code: `/* GENIUS V12 - LINE FOLLOWER */
+    code: `/* DEVGENIUS - LINE FOLLOWER */
 void setup() {
   pinMode(2, INPUT); pinMode(3, INPUT); // Sensores
   for(int i=4; i<=7; i++) pinMode(i, OUTPUT); // Motores
@@ -326,7 +326,7 @@ void loop() {
     id: "p9",
     title: "Braço Robótico Manipulador",
     description: "Controle preciso de 4 eixos utilizando joysticks analógicos e SG90.",
-    difficulty: "Supremacy",
+    difficulty: "Expert",
     compCount: 6,
     components: ["Arduino Uno", "4x Servo Motor MG996R", "2x Módulo Joystick KY-023"],
     connections: "- Joy 1: A0 (X), A1 (Y)\n- Joy 2: A2 (X), A3 (Y)\n- Servos: D3, D5, D6, D9 (PWM)",
@@ -357,11 +357,11 @@ void loop() {
     id: "p10",
     title: "Smart Home Controller V12",
     description: "Controle por voz, sensor de movimento e display informativo em um único hub.",
-    difficulty: "Supremacy",
+    difficulty: "Expert",
     compCount: 7,
     components: ["ESP32", "Módulo Sensor de Som", "Módulo Sensor de Movimento PIR", "Módulo Relé 5V", "Display LCD 16x2 com I2C", "Módulo DFPlayer Mini MP3", "Buzzer Passivo"],
     connections: "- LCD: SDA(D21), SCL(D22)\n- DFPlayer: TX(D17), RX(D16)\n- Sensores: D4 e D5",
-    code: `/* GENIUS V12 KERNEL - INTEGRATED HOME HUB */
+    code: `/* DEVGENIUS KERNEL - INTEGRATED HOME HUB */
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 

@@ -33,16 +33,16 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
   const [qStep, setQStep] = useState(0);
 
   const tourSlides = [
-    { title: "CONTROLADORAS", desc: "Explore o núcleo do DevGenius V12. Onde a lógica ganha vida em placas lendárias.", icon: Cpu },
-    { title: "LABORATÓRIO", desc: "Sua mesa de cirurgia digital. Conecte periféricos e gere esquemáticos com IA.", icon: Layout },
-    { title: "DEVGENIUS IA", desc: "Um copiloto inteligente forjado no DeepMind para guiar sua engenharia.", icon: MessageSquare },
-    { title: "BASE DE CÓDIGO", desc: "Aulas definitivas de C++ e JavaScript otimizadas para hardware.", icon: Terminal },
-    { title: "QUALIFICAÇÃO", desc: "Desafie seu intelecto em testes reais e ganhe sua certificação Supremacy.", icon: GraduationCap },
+    { title: "PLACAS", desc: "Conheça as principais placas de microcontroladores, do Arduino ao ESP32, com specs e exemplos.", icon: Cpu },
+    { title: "WORKSPACE", desc: "Monte seu circuito virtualmente e gere documentação técnica completa com IA.", icon: Layout },
+    { title: "ASSISTENTE IA", desc: "Tire dúvidas de hardware e código em tempo real com IA treinada para eletrônica.", icon: MessageSquare },
+    { title: "TRILHAS DE CÓDIGO", desc: "Aulas estruturadas de C++ e JavaScript voltadas a microcontroladores.", icon: Terminal },
+    { title: "CERTIFICAÇÃO", desc: "Teste seu conhecimento por nível e receba certificado ao concluir cada trilha.", icon: GraduationCap },
   ];
 
   const questions = [
-    { id: "focus", label: "QUAL O SEU FOCO NO DEVGENIUS?", options: ["Robótica", "IoT", "IA de Borda", "Engenharia Reversa", "Automação"], icon: Target },
-    { id: "expLevel", label: "QUAL SEU NÍVEL DE EXPERIÊNCIA?", options: ["Iniciante", "Maker Intermediário", "Engenheiro Sênior", "Ciborgue"], icon: Zap }
+    { id: "focus", label: "QUAL O SEU FOCO?", options: ["Robótica", "IoT", "IA de Borda", "Automação Residencial", "Aprender do zero"], icon: Target },
+    { id: "expLevel", label: "QUAL SEU NÍVEL DE EXPERIÊNCIA?", options: ["Iniciante", "Intermediário", "Avançado", "Profissional"], icon: Zap }
   ];
 
   // Form states
@@ -263,21 +263,21 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                     <HandMetal className="w-10 h-10" />
                   </div>
                   <div className="space-y-4">
-                    <h2 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">OLÁ <br/> <span className="text-cyan-400">PROGRAMADOR</span></h2>
-                    <p className="text-neutral-500 font-medium text-sm leading-relaxed max-w-[250px] mx-auto">Seja bem-vindo ao núcleo DevGenius. Onde o silício e o código se tornam arte.</p>
+                    <h2 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">BEM-VINDO AO <br/> <span className="text-cyan-400">DEVGENIUS</span></h2>
+                    <p className="text-neutral-500 font-medium text-sm leading-relaxed max-w-[250px] mx-auto">Plataforma de estudo e prototipagem em hardware embarcado. Aprenda, construa e teste.</p>
                   </div>
                   <div className="w-full space-y-4 pt-4">
-                    <button 
+                    <button
                       onClick={() => setMode("login")}
                       className="w-full h-14 bg-white/5 border border-white/5 hover:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
                     >
-                      JÁ TENHO UM KERNEL
+                      JÁ TENHO CONTA
                     </button>
-                    <button 
+                    <button
                       onClick={() => setMode("questionnaire")}
                       className="w-full h-16 bg-cyan-500 text-neutral-950 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-cyan-500/20"
                     >
-                      VAMOS FAZER PARTE DA FAMÍLIA
+                      CRIAR MINHA CONTA
                     </button>
                   </div>
               </motion.div>
@@ -333,11 +333,11 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                 transition={{ duration: 0.3 }}
               >
                 <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 uppercase tracking-tight">
-                  {mode === "login" && <><Lock className="w-5 h-5 text-cyan-400" /> Entrar na Conta</>}
-                  {mode === "register" && <><UserIcon className="w-5 h-5 text-cyan-400" /> Criar Identidade Digital</>}
-                  {mode === "forgot" && <><ShieldCheck className="w-5 h-5 text-cyan-400" /> Recuperação de Acesso</>}
-                  {mode === "verify" && <><Key className="w-5 h-5 text-cyan-400" /> Verificação de Identidade</>}
-                  {mode === "reset" && <><Lock className="w-5 h-5 text-emerald-400" /> Nova Chave de Acesso</>}
+                  {mode === "login" && <><Lock className="w-5 h-5 text-cyan-400" /> Entrar na conta</>}
+                  {mode === "register" && <><UserIcon className="w-5 h-5 text-cyan-400" /> Criar conta</>}
+                  {mode === "forgot" && <><ShieldCheck className="w-5 h-5 text-cyan-400" /> Recuperar acesso</>}
+                  {mode === "verify" && <><Key className="w-5 h-5 text-cyan-400" /> Verificar identidade</>}
+                  {mode === "reset" && <><Lock className="w-5 h-5 text-emerald-400" /> Nova senha</>}
                 </h2>
 
                 <form onSubmit={handleAuth} className="space-y-4">
@@ -549,7 +549,7 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                       onClick={() => setShowTour(true)}
                       className="w-full flex items-center justify-center gap-2 text-cyan-400 border border-cyan-500/20 bg-cyan-500/5 font-black py-4 rounded-xl hover:bg-cyan-500/10 transition-all text-xs tracking-widest"
                     >
-                      <Play className="w-4 h-4 group-hover:scale-110 transition-transform" /> VAMOS FAZER UM TOUR NO V12
+                      <Play className="w-4 h-4 group-hover:scale-110 transition-transform" /> CONHECER A PLATAFORMA
                     </button>
 
                     <button
@@ -637,13 +637,13 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                 <div className="relative z-10">
                   <div className="flex items-center gap-3 mb-8">
                      <Sparkles className="w-5 h-5 text-cyan-400" />
-                     <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400">DevGenius Experience v12</span>
+                     <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400">Tour DEVGENIUS</span>
                   </div>
                   <h3 className="text-5xl font-black text-white tracking-tighter uppercase leading-none mb-6">
-                    MÁXIMA <br/> <span className="text-cyan-400">POTÊNCIA</span>
+                    O QUE VOCÊ <br/> <span className="text-cyan-400">ENCONTRA AQUI</span>
                   </h3>
                   <p className="text-neutral-500 font-medium text-lg leading-relaxed">
-                    Vivencie a interface que mudou as regras do jogo. O DEVGENIUS V12 é o pilar da nova engenharia.
+                    Catálogo de hardware, projetos guiados, assistente IA e certificação. Em um só lugar.
                   </p>
                 </div>
 

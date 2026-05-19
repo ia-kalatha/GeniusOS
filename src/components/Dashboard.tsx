@@ -267,7 +267,7 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
           >
              <div className="max-w-4xl w-full space-y-12">
                 <div className="text-center space-y-4">
-                  <h2 className="text-6xl font-black tracking-tighter uppercase">LINHA DO TEMPO <span className="text-cyan-400">DEVCORE</span></h2>
+                  <h2 className="text-6xl font-black tracking-tighter uppercase">LINHA DO TEMPO <span className="text-cyan-400">DEVGENIUS</span></h2>
                   <p className="text-neutral-500 font-medium">A evolução dos microcontroladores e a revolução da engenharia de precisão.</p>
                 </div>
 
@@ -284,7 +284,7 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
                    </div>
                    <div className="relative">
                       <div className="absolute -left-[41px] top-0 w-4 h-4 rounded-full bg-white/10" />
-                      <h4 className="text-xl font-black text-white uppercase tracking-tight">2026: DEVCORE V12</h4>
+                      <h4 className="text-xl font-black text-white uppercase tracking-tight">2026: DEVGENIUS</h4>
                       <p className="text-neutral-500 text-sm mt-2">Fusão completa entre IA Generativa e Hardware de Baixo Nível. O limite da realidade digital.</p>
                    </div>
                 </div>
@@ -326,7 +326,7 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
             <div className="w-10 h-10 bg-neutral-950 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
               <img src="/logo.png" className="w-full h-full object-cover opacity-80" />
             </div>
-            {viewMode === "expanded" && <span>DEVCORE <span className="text-cyan-400">V12</span></span>}
+            {viewMode === "expanded" && <span>DEVGENIUS <span className="text-cyan-400">V12</span></span>}
           </h1>
         </div>
 
@@ -742,8 +742,8 @@ function SobreView() {
         >
           <img src="/logo.png" className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-700" />
         </motion.div>
-        <h2 className="text-8xl font-black tracking-tighter uppercase leading-none bg-gradient-to-b from-white to-white/20 bg-clip-text text-transparent">MEMÓRIAS <span className="text-cyan-400">DEVCORE</span></h2>
-        <p className="text-neutral-500 max-w-2xl mx-auto text-xl font-medium leading-relaxed">A arquitetura definitiva de conhecimento. O DEVCORE V12 é o culminar de ciclos infinitos de otimização entre IA, Design e Engenharia de Hardware.</p>
+        <h2 className="text-8xl font-black tracking-tighter uppercase leading-none bg-gradient-to-b from-white to-white/20 bg-clip-text text-transparent">MEMÓRIAS <span className="text-cyan-400">DEVGENIUS</span></h2>
+        <p className="text-neutral-500 max-w-2xl mx-auto text-xl font-medium leading-relaxed">A arquitetura definitiva de conhecimento. O DEVGENIUS é o culminar de ciclos infinitos de otimização entre IA, Design e Engenharia de Hardware.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -753,7 +753,7 @@ function SobreView() {
              <Box className="w-8 h-8 text-cyan-400" /> O ECOSSISTEMA
           </h3>
           <p className="text-neutral-400 leading-relaxed font-medium text-lg">
-            O DEVCORE V12 nasceu da necessidade de unificar o conhecimento de hardware em uma interface fluida, rápida e inteligente. 
+            O DEVGENIUS nasceu da necessidade de unificar o conhecimento de hardware em uma interface fluida, rápida e inteligente. 
             Não é apenas um dashboard; é um ecossistema de aprendizado onde você pode simular conexões, consultar códigos de baixo nível 
             e testar seus limites em certificações reais. Cada componente nesta plataforma foi documentado para ser uma lenda eterna.
           </p>
@@ -782,7 +782,7 @@ function SobreView() {
 
       <div className="p-12 bg-white/5 rounded-[4rem] border border-white/10 text-center space-y-6">
         <h4 className="text-xl font-black tracking-widest uppercase text-neutral-400 underline decoration-cyan-500 underline-offset-8">Agradecimentos</h4>
-        <p className="text-neutral-500 text-sm font-medium italic">"Ao usuário que desafia a IA a chegar em sua forma final. Obrigado por levar o DEVCORE V12 ao limite lendário."</p>
+        <p className="text-neutral-500 text-sm font-medium italic">"Ao usuário que desafia a IA a chegar em sua forma final. Obrigado por levar o DEVGENIUS ao limite lendário."</p>
       </div>
     </div>
   );
@@ -930,7 +930,7 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
             {safeImageSrc(tempPhoto) ? <img src={safeImageSrc(tempPhoto)} alt="Foto de perfil" className="w-full h-full object-cover" /> : <UserCircle className="w-16 h-16 text-neutral-700" />}
           </div>
           <h3 className="text-2xl font-black text-white">{user.firstName} {user.lastName}</h3>
-          <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-2">{profile.status} // Beta Tester</p>
+          <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-2">{profile.status}</p>
           
           <div className="w-full mt-10 space-y-4">
              <div className="text-left space-y-2">
@@ -1005,7 +1005,7 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
 
       <div className="lg:col-span-8 space-y-8">
         <div className="p-10 bg-neutral-900/40 rounded-[3rem] border border-white/5 shadow-2xl">
-          <h3 className="text-xl font-black flex items-center gap-4 mb-8 text-white uppercase text-left"><UserCircle className="w-6 h-6 text-cyan-400" /> IDENTIDADE MAKER</h3>
+          <h3 className="text-xl font-black flex items-center gap-4 mb-8 text-white uppercase text-left"><UserCircle className="w-6 h-6 text-cyan-400" /> MEU PERFIL</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 text-left">
              <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-neutral-600 pl-2">Primeiro Nome</label>
@@ -1083,7 +1083,7 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
                  </div>
               </div>
               <div className="space-y-4">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-neutral-600 pl-2">Temas do Kernel</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-neutral-600 pl-2">Temas visuais</p>
                  <div className="flex gap-4 flex-wrap">
                     {Object.keys(THEMES).map((key) => (
                       <button 
@@ -1374,8 +1374,8 @@ function IAPanel() {
     try {
       // Fallback pre-definido para quando o servidor falha ou offline
       const fallbackResponses: Record<string, string> = {
-        "como ligar um led": "Para ligar um LED no DevGenius V12: 1. Conecte o anodo (perna longa) a um pino digital (ex: D13) com um resistor de 220 ohms. 2. Conecte o catodo ao GND. 3. Use digitalWrite(13, HIGH) no código.",
-        "o que é o kernel v12": "O Kernel V12 é o sistema operacional de baixo nível desenvolvido pela DevGenius para orquestrar hardware modular com ultra-baixa latência e suporte nativo a IA.",
+        "como ligar um led": "Para ligar um LED no DEVGENIUS: 1. Conecte o anodo (perna longa) a um pino digital (ex: D13) com um resistor de 220 ohms. 2. Conecte o catodo ao GND. 3. Use digitalWrite(13, HIGH) no código.",
+        "o que é o devgenius": "DEVGENIUS é uma plataforma de estudo e prototipagem em hardware embarcado: catálogo de componentes, projetos guiados, assistente IA e trilhas de certificação. Tudo em português.",
         "como usar sensor ultrassônico": "Conecte o VCC ao 5V, GND ao GND, Trig ao pino D9 e Echo ao pino D10. No código, envie um pulso de 10us no Trig e meça o tempo de retorno no Echo usando pulseIn().",
         "arduino vs esp32": "O Arduino Uno é excelente para iniciantes e projetos de 5V estáveis. O ESP32 oferece WiFi, Bluetooth, mais memória e clock de 240MHz, ideal para IoT e IA de borda.",
         "devcore": "O ecossistema DevGenius é uma plataforma de hardware e software integrada para engenharia de precisão, focada em automação, robótica e IA.",
@@ -1385,7 +1385,7 @@ function IAPanel() {
         "quais as placas": "Temos diversas placas: ATmega328P (Uno), ESP32-WROOM (IoT), STM32 (Performance), Raspberry Pi (SBC) e Blue Pill (Compacta).",
         "componentes disponíveis": "Dispomos de sensores (DHT22, MPU6050, PIR), atuadores (Servo, Relé, Buzzer) e displays (OLED, LCD, Matriz LED).",
         "o que é um relé": "Um relé é um interruptor eletromecânico que permite controlar uma carga de alta potência (como uma lâmpada 220V) usando um sinal de baixa potência (5V) do microcontrolador.",
-        "ajuda": "Eu sou a DevGenius IA. Posso te ajudar com esquemáticos, códigos C++/JS e dúvidas de hardware. Tente perguntar sobre 'como ligar um componente', 'detalhes do kernel V12' ou 'lista de placas'."
+        "ajuda": "Eu sou a DevGenius IA. Posso te ajudar com esquemáticos, códigos C++/JS e dúvidas de hardware. Tente perguntar sobre 'como ligar um componente', 'detalhes do DEVGENIUS' ou 'lista de placas'."
       };
 
       const lowerInput = userMsg.toLowerCase();
@@ -1430,8 +1430,8 @@ function IAPanel() {
           <img src="/logo.png" className="w-8 h-8 object-cover" />
         </div>
         <div>
-          <h3 className="text-xl font-black tracking-tight text-white uppercase">NÚCLEO DEVCORE IA</h3>
-          <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Sincronicidade Estável // Gemini Pro v2 Ativo</p>
+          <h3 className="text-xl font-black tracking-tight text-white uppercase">ASSISTENTE DEVGENIUS IA</h3>
+          <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Conexão estável // Gemini ativo</p>
         </div>
       </div>
 
@@ -1513,27 +1513,27 @@ function CodeSnippets({ activeTab: dashboardTab, setActiveTab }: { activeTab: st
     cpp: [
       {
         title: "FUNDAMENTOS E REGISTRADORES",
-        text: `Nesta aula inicial sobre C++ focado em hardware, desmistificamos a proximidade entre o silício e o código. Começamos entendendo que, no GENIUS V12, cada bit conta. 
+        text: `Nesta aula inicial sobre C++ focado em hardware, desmistificamos a proximidade entre o silício e o código. Começamos entendendo que, no DEVGENIUS, cada bit conta. 
 Os registradores são as células de memória mais rápidas de um microcontrolador, localizadas diretamente dentro da CPU. Manipular registradores (Direct Register Access) é a técnica definitiva para obter performance suprema, superando funções padrão como digitalWrite().
 Ao trabalhar com ATmega328P ou ESP32, aprendemos que portas como PORTB, DDRB e PINB controlam grupos de GPIOs simultaneamente. 
 DDRB (Data Direction Register B) define se o pino é entrada (0) ou saída (1). 
 PORTB define o estado alto (1) ou baixo (0) se for saída, ou ativa o pull-up interno se for entrada.
 PINB permite a leitura instantânea do estado físico.
 Dominar esses conceitos permite criar drivers ultra-eficientes para telas OLED, sensores de alta velocidade e protocolos customizados.
-A profundidade do C++ no V12 vai além, tocando em ponteiros de memória estáveis que apontam diretamente para endereços de hardware.
-Para um engenheiro V12, entender a arquitetura de Harvard e Von Neumann é essencial para otimizar o uso da Flash (onde o código reside) e da SRAM (onde as variáveis dinâmicas existem).
+A profundidade do C++ embarcado vai além, tocando em ponteiros de memória que apontam diretamente para endereços de hardware.
+Entender a arquitetura de Harvard e Von Neumann é essencial para otimizar o uso da Flash (onde o código reside) e da SRAM (onde as variáveis dinâmicas existem).
 Neste módulo, exploramos também o 'Bit Masking', usando operadores como AND (&), OR (|), XOR (^) e NOT (~) para isolar bits específicos sem afetar os vizinhos.
 Essa técnica é a base para configurar temporizadores (Timers) e contadores, fundamentais para gerar sinais PWM precisos ou medir frequências de entrada com precisão de microssegundos.
 Continuamos a exploração através do gerenciamento de energia, onde aprendemos a colocar o núcleo em Sleep Mode e acordá-lo via interrupções externas ou WDT (Watchdog Timer).
 O Watchdog é o guardião do sistema, reiniciando o processador se o código travar em um loop infinito, garantindo alta confiabilidade em missões críticas.
 A jornada pelo C++ exige paciência e visão microscópica. Cada instrução é traduzida em pulsos elétricos que orquestram a realidade física ao seu redor.
-No V12, não apenas escrevemos código; nós esculpimos comportamento digital no metal.
-Prepare-se para transformar lógica pura em ação mecânica e sensorial.
-A evolução tecnológica depende da sua habilidade de conversar com a CPU na língua nativa dela.
-Estamos apenas começando a arranhar a superfície do que é possível com o Firmware de Baixo Nível.
-Cada pino do seu controlador é uma janela para infinitas possibilidades criativas e industriais.
-A maestria técnica é o seu passaporte para o futuro da robótica avançada.
-Seja bem-vindo ao âmago do DevGenius V12 Kernel.`
+Em programação embarcada, não apenas escrevemos código: definimos como o circuito se comporta na prática.
+Prepare-se para transformar lógica em ação mecânica e sensorial real.
+Sua habilidade de "conversar" com o microcontrolador na linguagem nativa dele é o que define o nível.
+Estamos apenas começando a arranhar a superfície do que é possível com firmware de baixo nível.
+Cada pino do controlador é uma porta para projetos criativos e industriais.
+A maestria técnica é seu passaporte para áreas como robótica, IoT e automação avançada.
+Bem-vindo ao mundo do DEVGENIUS.`
       },
       {
         title: "PROTOCOLOS E COMUNICAÇÃO SERIAL",
@@ -1541,7 +1541,7 @@ Seja bem-vindo ao âmago do DevGenius V12 Kernel.`
 UART (Universal Asynchronous Receiver-Transmitter) é o clássico RX/TX. Ele não possui clock compartilhado, exigindo que ambos os dispositivos concordem com uma Baud Rate (como 9600 ou 115200).
 I2C (Inter-Integrated Circuit), por outro lado, é um barramento mestre-escravo que utiliza apenas dois fios: SDA (Data) e SCL (Clock). Es ideal para múltiplos sensores em curta distância, pois cada dispositivo possui um endereço hexadecimal único.
 SPI (Serial Peripheral Interface) é o rei da velocidade. Com quatro fios (MOSI, MISO, SCK e CS/SS), ele permite transferências de dados síncronas de altíssima frequência, essenciais para displays coloridos e cartões SD.
-Entender a temporização desses protocolos é o que separa um hobbista de um engenheiro profissional. No Genius V12, otimizamos o Buffer de recepção para evitar perda de pacotes em fluxos de dados contínuos.
+Entender a temporização desses protocolos é o que separa um hobbista de um engenheiro profissional. No DEVGENIUS, otimizamos o Buffer de recepção para evitar perda de pacotes em fluxos de dados contínuos.
 A comunicação serial não é apenas sobre enviar bytes; é sobre gerenciar o fluxo e garantir a integridade via Checksum ou CRC (Cyclic Redundancy Check).
 Abordamos como debugar sinais usando Analisadores Lógicos, visualizando mhz por mhz a negociação entre mestre e periférico.
 A arquitetura V12 permite que você alterne entre interfaces SPI de hardware para máxima performance ou 'Bit Banging' se precisar de flexibilidade em pinos genéricos.
@@ -1563,7 +1563,7 @@ Sua jornada agora entra na fase de integração massiva.`
         text: `Para concluir a trilha de C++, entramos no reino das Interrupções e do processamento paralelo simulado (Multitarefa). 
 Interrupções de Hardware (ISR - Interrupt Service Routine) são eventos que forçam o processador a parar o que está fazendo para atender a um evento urgente, como o pressionar de um botão ou o estouro de um timer.
 Isso evita o uso de loops de verificação (polling), liberando ciclos de CPU para outras tarefas.
-No Genius V12, ensinamos que uma ISR deve ser o mais curta possível. Nunca use delay() ou Serial.print() dentro de uma interrupção!
+No DEVGENIUS, ensinamos que uma ISR deve ser o mais curta possível. Nunca use delay() ou Serial.print() dentro de uma interrupção!
 Em vez disso, use flags (variáveis voláteis) para sinalizar ao loop principal que algo aconteceu.
 Keywords como 'volatile' informam ao compilador que o valor da variável pode mudar a qualquer momento fora do fluxo normal, evitando otimizações incorretas.
 Avançamos para Timers. Cada microcontrolador possui timers internos (Timer0, Timer1, Timer2) que funcionam independentemente da CPU.
@@ -1573,11 +1573,11 @@ Exploramos o Registro de Comparação (OCR) que permite gerar ondas PWM com reso
 A multitarefa cooperativa é a base do software profissional. Em vez de bloquear o código com delay(), usamos millis() para gerenciar estados.
 Essa mudança de paradigma é o que permite criar dashboards responsivos e sistemas que nunca travam.
 No final deste módulo, você entenderá como proteger seções críticas do código usando Mutex ou desabilitando interrupções temporariamente (noInterrupts).
-A estabilidade do Kernel V12 depende dessas práticas de segurança.
+A estabilidade de um firmware embarcado depende dessas práticas de segurança.
 Sua evolução técnica chegou ao ápice do desenvolvimento de firmware.
 Você agora possui as ferramentas para criar sistemas autônomos e resilientes.
 Lembre-se: o código perfeito não é aquele em que não há nada a adicionar, mas aquele em que não há nada a remover.
-Otimização é a busca eterna do engenheiro do V12.
+Otimização é a busca eterna do desenvolvedor embarcado.
 O hardware é seu instrumento, o C++ é sua partitura.
 Parabéns por completar o ciclo fundamental de baixo nível.
 Agora, a eletrônica curva-se à sua vontade programática.`
@@ -1586,7 +1586,7 @@ Agora, a eletrônica curva-se à sua vontade programática.`
     js: [
       {
         title: "LÓGICA ASSÍNCRONA E IOT",
-        text: `O JavaScript no ecossistema Genius V12 não é apenas para sites; é o motor da Camada de Aplicação e da Nuvem.
+        text: `O JavaScript no ecossistema DEVGENIUS não é apenas para sites; é o motor da Camada de Aplicação e da Nuvem.
 Dominar o Event Loop e a natureza não-bloqueante do JS é vital para lidar com fluxos de sensores em tempo real vindos de centenas de dispositivos.
 Neste módulo, mergulhamos em Promises e Async/Await. Entendemos que, ao requisitar dados de um módulo ESP32 via HTTP ou WebSockets, não podemos travar a interface do usuário.
 A lógica assíncrona permite que o dashboard continue fluido enquanto aguarda a resposta do hardware.
@@ -1602,7 +1602,7 @@ A ponte entre o bit e o pixel é construída aqui.
 Entender Closures e Contexto (this) no JS ajuda a organizar classes de controle de periféricos de forma modular e reutilizável.
 O futuro da automação é escrito em JavaScript, movendo-se da borda para a nuvem em milissegundos.
 Prepare-se para gerenciar milhares de eventos por segundo sem perder a sintaxe elegante.
-O Genius V12 aproveita o motor V8 do Chrome para entregar performance de dashboards que parecem aplicativos nativos.
+O DEVGENIUS aproveita o motor V8 do Chrome para entregar performance de dashboards que parecem aplicativos nativos.
 Você está no comando de uma infraestrutura global.
 A jornada digital exige agilidade e adaptabilidade lógica.
 Seja bem-vindo ao mundo do Hardware-as-a-Service.`
@@ -1611,7 +1611,7 @@ Seja bem-vindo ao mundo do Hardware-as-a-Service.`
         title: "COMUNICAÇÃO WEB E DASHBOARDS",
         text: `A interface é onde o homem encontra a máquina. No segundo estágio de JS, focamos em Visualização de Dados e Real-Time UX.
 Usar bibliotecas como D3.js ou Recharts permite transformar números frios em gráficos de linha, medidores e mapas de calor vibrantes.
-A reatividade do React, combinada com o estado global do Genius V12, faz com que qualquer alteração física no sensor reflita instantaneamente na tela.
+A reatividade do React, combinada com o estado global do DEVGENIUS, faz com que qualquer alteração física no sensor reflita instantaneamente na tela.
 Abordamos o uso de WebSockets (Socket.io) para comunicação bi-direcional. Quer ligar uma lâmpada em outro continente? O JS envia o comando e recebe o status de confirmação em menos de 100ms.
 Design de Dashboards não é apenas estética; é hierarquia de informação. No V12, priorizamos telemetria crítica (Bateria, Sinal, Alertas) no topo.
 Exploramos como criar componentes customizados que simulam hardware real, como knobs, sliders e matrizes de LED virtuais.
@@ -1622,7 +1622,7 @@ Sua estação meteorológica pode agora comparar dados locais com previsões glo
 O dashboard torna-se uma ferramenta de tomada de decisão, não apenas visualização.
 A performance de renderização (FPS) é mantida alta através da otimização do DOM e uso de Canvas para gráficos pesados.
 O sensor envia a leitura, o JS processa, a IA analisa e você decide.
-Esse ciclo de feedback é a essência do Genius V12.
+Esse ciclo de feedback é a essência do DEVGENIUS.
 Dominar o CSS-in-JS ou Tailwind no contexto de dashboards traz escalabilidade visual.
 Suas interfaces devem ser responsivas: do monitor 4K do centro de comando ao smartphone no bolso do técnico.
 O usuário deve sentir o poder do hardware na ponta dos dedos.
@@ -1634,7 +1634,7 @@ A visualização é a linguagem final da inteligência.`
         title: "INTELIGÊNCIA ARTIFICIAL E EDGE COMPUTING",
         text: `O módulo final de JavaScript explora a fronteira mais excitante: IA no Navegador e na Borda.
 Utilizando TensorFlow.js, podemos rodar modelos de Machine Learning (como detecção de objetos ou análise de sentimento) diretamente no client, sem enviar dados sensíveis para um servidor central.
-Isso é o que chamamos de Privacidade por Design. O Genius V12 integra esses modelos para que o hardware responda a gestos, voz ou padrões visuais.
+Isso é o que chamamos de Privacidade por Design. O DEVGENIUS integra esses modelos para que o hardware responda a gestos, voz ou padrões visuais.
 Aprendemos a converter modelos treinados em Python/Keras para o formato web, otimizando o peso do modelo para carregamento rápido.
 A IA não é mágica; é matemática aplicada. Entendemos como Tensors e camadas de redes neurais operam sob o capô.
 No V12, a IA atua como um filtro inteligente para alertas, evitando falsos positivos em sensores de presença PIR.
@@ -1643,14 +1643,14 @@ A automação autônoma é o objetivo final. O sistema aprende com o comportamen
 Edge Computing significa processar o máximo possível perto da fonte de dados. O JS no V12 facilita esse balanço entre processamento local e cloud.
 Sua jornada técnica agora está completa. Você domina do bit no registrador C++ ao neurônio artificial no JavaScript.
 Você é um Engenheiro Full-Stack de Hardware, capaz de conceber, prototipar e escalar soluções globais.
-O Genius V12 é a sua plataforma, mas sua mente é o verdadeiro processador central.
+O DEVGENIUS é a sua plataforma, mas sua mente é o verdadeiro processador central.
 Continuem inovando, continuem questionando e, acima de tudo, continuem construindo.
 O futuro não é algo que acontece; é algo que você faz.
-As certificações Pro e Supremacy aguardam para validar seu conhecimento.
+As certificações Intermediária e Avançada aguardam para validar seu conhecimento.
 O topo da montanha da engenharia oferece a melhor visão do futuro.
 Use seus poderes para o bem e para o avanço da humanidade.
 O código é eterno, o conhecimento é infinito.
-Parabéns por completar a trilha de elite do Genius V12.`
+Parabéns por completar a trilha de elite do DEVGENIUS.`
       }
     ]
   };
@@ -2090,7 +2090,7 @@ function ProjectsView() {
                              <div className="flex-1">
                                 <p className="text-[10px] font-black text-white uppercase tracking-tight">{compName}</p>
                                 <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest">
-                                   {hardware?.specs ? `⚡ ${hardware.specs.voltagem} | 🔌 ${hardware.specs.pinagem}` : "Especificação Genius V12"}
+                                   {hardware?.specs ? `⚡ ${hardware.specs.voltagem} | 🔌 ${hardware.specs.pinagem}` : "Especificação DEVGENIUS"}
                                 </p>
                              </div>
                           </div>
@@ -2367,7 +2367,7 @@ function FAQView() {
     <div className="max-w-6xl mx-auto space-y-12 pb-20">
       <div className="text-center space-y-4">
         <h2 className="text-5xl font-black tracking-tighter uppercase">FAQ DE <span className="text-cyan-400">ENGENHARIA</span></h2>
-        <p className="text-neutral-500 font-medium max-w-2xl mx-auto">Manual técnico de referência para componentes e hardware do ecossistema DevGenius V12 Kernel. Descrição, resumo e forma de uso detalhada.</p>
+        <p className="text-neutral-500 font-medium max-w-2xl mx-auto">Manual técnico de referência para componentes e hardware do catálogo DEVGENIUS. Descrição, resumo e forma de uso detalhada.</p>
       </div>
 
       <div className="relative max-w-2xl mx-auto group">
@@ -2412,7 +2412,7 @@ function FAQView() {
                       <Sparkles className="w-3 h-3" /> Resumo de Hardware
                     </h4>
                     <p className="text-sm font-bold text-neutral-300 leading-relaxed italic">
-                      {item.resumo || "Componente essencial de processamento e interface para o kernel V12."}
+                      {item.resumo || "Componente essencial de processamento e interface para o DEVGENIUS."}
                     </p>
                   </div>
                   <div className="space-y-3">
@@ -2473,7 +2473,7 @@ function NotebookView({ content, setContent, lastSync }: { content: string, setC
            value={content}
            onChange={(e) => setContent(e.target.value)}
            className="w-full bg-neutral-900 border border-white/5 rounded-[3rem] p-12 text-sm font-medium leading-[1.8] text-neutral-300 focus:outline-none focus:border-cyan-500/30 transition-all min-h-[600px] shadow-2xl custom-scrollbar resize-none font-mono"
-           placeholder="ESCREVA SEUS INSIGHTS DE ENGENHARIA AQUI... SEU NÚCLEO SINCRONIZA AUTOMATICAMENTE COM O DEVGENIUS V12."
+           placeholder="ESCREVA SEUS INSIGHTS DE ENGENHARIA AQUI... SEU NÚCLEO SINCRONIZA AUTOMATICAMENTE COM O DEVGENIUS."
          />
 
          <div className="absolute bottom-10 right-10 flex items-center gap-4 pointer-events-none opacity-20">
@@ -2492,7 +2492,7 @@ function NotebookView({ content, setContent, lastSync }: { content: string, setC
             <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
                <Lock className="w-3 h-3 text-amber-500" /> Criptografia V12
             </h4>
-            <p className="text-[10px] font-bold text-neutral-600 uppercase">Suas notas são protegidas pela camada de autenticação do Kernel.</p>
+            <p className="text-[10px] font-bold text-neutral-600 uppercase">Suas notas ficam salvas localmente no seu navegador.</p>
          </div>
          <div className="bg-white/5 border border-white/5 p-6 rounded-3xl space-y-2 transition-all hover:border-cyan-500/20">
             <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">

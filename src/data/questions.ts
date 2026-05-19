@@ -1,82 +1,142 @@
+// 90 questões curadas em 3 trilhas temáticas (30 cada).
+// Substitui o gerador procedural anterior (que produzia conteúdo fake).
+// Dentro de cada trilha as questões progridem do conceitual ao prático.
+
 export interface Question {
   id: string;
   text: string;
   options: string[];
   correctIndex: number;
+  explanation: string;
 }
 
-export type Subject = "componentes" | "placas" | "js" | "cpp" | "final";
-export type Level = "basico" | "intermediario" | "pro";
+export type Trilha = "eletronica" | "arduino" | "sensores";
 
-const generateSet = (level: Level, subject: Subject, count: number) => {
-  const levelPrefix = level.toUpperCase();
-  const subName = subject.toUpperCase();
-  
-  const techs: Record<Subject, string[]> = {
-    componentes: ["Resistor", "Capacitor", "Diodo", "Transistor", "LED", "Indutor", "Transformador", "Relé", "Cristal", "Potenciômetro", "Buzzer", "Display", "Sensor", "CI 555", "AmpOp"],
-    placas: ["Arduino Uno", "ESP32", "Raspberry Pi", "Arduino Mega", "STM32", "Nano Every", "Leonardo", "Due", "Blue Pill", "NodeMCU", "MKR1000", "Teensy", "Jetson", "Pico", "BeagleBone"],
-    js: ["Array.map()", "Promises", "Async/Await", "Closure", "Event Loop", "DOM", "Fetch API", "Hoisting", "Strict Mode", "Callbacks", "Prototypes", "JSON", "LocalStorage", "Scope", "Objects"],
-    cpp: ["Ponteiros", "Classes", "Templates", "Namespaces", "Structs", "Overrides", "Herança", "Polimorfismo", "Malloc", "Define", "Include", "Setup", "Loop", "Interrupts", "Registers"],
-    final: ["Sistema Crítico", "Automação", "Robótica", "IoT", "Firmware", "Hardware", "Software", "Debugging", "Protocólos", "Sincronia", "Latência", "Escalabilidade", "Segurança", "Energia", "Rede"]
-  };
-
-  const actions: Record<Level, string[]> = {
-    basico: ["identificar", "conectar", "conhecer", "validar", "testar"],
-    intermediario: ["otimizar", "sincronizar", "configurar", "depurar", "integrar"],
-    pro: ["arquitetar", "encriptar", "modularizar", "escalar", "compilar"]
-  };
-
-  const results: string[] = [
-    "o fluxo de sinal de controle", "a estabilidade térmica do sistema", "a eficiência energética global", 
-    "a largura de banda de dados", "a integridade física do componente", "a velocidade de processamento",
-    "a segurança da camada física", "a precisão da amostragem", "o tempo de resposta nominal",
-    "a latência de execução", "a coerência da memória cache", "a robustez do barramento",
-    "a comunicação full-duplex", "o regime de saturação magnética", "a impedância de entrada"
-  ];
-  
-  return Array.from({ length: count }, (_, i) => {
-    const tech = techs[subject][i % techs[subject].length];
-    const action = actions[level][i % actions[level].length];
-    const difficultyPrefix = level === "basico" ? "Iniciante" : level === "intermediario" ? "Ninja" : "Cyber-Pro";
-    
-    // Create random unique options by shifting indices or combining different results
-    const opts = [
-      `Garantir ${results[(i) % results.length]}`,
-      `Melhorar ${results[(i + 1) % results.length]}`,
-      `Ajustar ${results[(i + 2) % results.length]}`,
-      `Monitorar ${results[(i + 3) % results.length]}`,
-      `Resetar ${results[(i + 4) % results.length]}`
-    ];
-    
-    return {
-      id: `${level}-${subject}-${i}`,
-      text: `[${difficultyPrefix}] Como ${action} corretamente o(a) ${tech} para ${results[(i + 7) % results.length]}?`,
-      options: opts,
-      correctIndex: i % 5
-    };
-  });
+export const TRILHA_INFO: Record<Trilha, { label: string; desc: string }> = {
+  eletronica: {
+    label: "Eletrônica Básica",
+    desc: "Tensão, corrente, Lei de Ohm, componentes passivos e segurança elétrica.",
+  },
+  arduino: {
+    label: "Arduino do Zero",
+    desc: "Estrutura de sketch, pinos digitais e analógicos, comunicação serial e PWM.",
+  },
+  sensores: {
+    label: "Sensores e Atuadores",
+    desc: "Como ler DHT, ultrassônico, MPU; controlar LED, buzzer, servo, motor e relé.",
+  },
 };
 
-export const QUESTIONS: Record<Level, Record<Subject, Question[]>> = {
-  basico: {
-    componentes: generateSet("basico", "componentes", 30),
-    placas: generateSet("basico", "placas", 30),
-    js: generateSet("basico", "js", 30),
-    cpp: generateSet("basico", "cpp", 30),
-    final: generateSet("basico", "final", 40),
-  },
-  intermediario: {
-    componentes: generateSet("intermediario", "componentes", 30),
-    placas: generateSet("intermediario", "placas", 30),
-    js: generateSet("intermediario", "js", 30),
-    cpp: generateSet("intermediario", "cpp", 30),
-    final: generateSet("intermediario", "final", 40),
-  },
-  pro: {
-    componentes: generateSet("pro", "componentes", 30),
-    placas: generateSet("pro", "placas", 30),
-    js: generateSet("pro", "js", 30),
-    cpp: generateSet("pro", "cpp", 30),
-    final: generateSet("pro", "final", 40),
-  }
+// ───────────────────────────────────────────────────────────────────────────
+// Trilha 1 — Eletrônica Básica
+// ───────────────────────────────────────────────────────────────────────────
+const ELETRONICA: Question[] = [
+  { id: "el-01", text: "O que mede um voltímetro?", options: ["Corrente elétrica em ampères", "Diferença de potencial em volts", "Resistência em ohms", "Potência em watts"], correctIndex: 1, explanation: "Voltímetro mede tensão (diferença de potencial), sempre conectado em paralelo ao componente." },
+  { id: "el-02", text: "Qual a unidade de medida da corrente elétrica?", options: ["Volt (V)", "Ohm (Ω)", "Ampère (A)", "Watt (W)"], correctIndex: 2, explanation: "Corrente elétrica é medida em ampères. 1 A = 1 coulomb por segundo." },
+  { id: "el-03", text: "A Lei de Ohm diz que:", options: ["V = I × R", "V = I / R", "V = I + R", "V = I − R"], correctIndex: 0, explanation: "Tensão (V) = Corrente (I) × Resistência (R). É a relação mais fundamental da eletrônica." },
+  { id: "el-04", text: "Para um LED comum (~2V, 20mA) alimentado por 5V, qual resistor série é adequado?", options: ["10 Ω", "150 Ω", "220 Ω", "10 kΩ"], correctIndex: 2, explanation: "R = (5−2)/0,02 = 150 Ω no mínimo. 220 Ω é o valor comercial seguro mais próximo." },
+  { id: "el-05", text: "O que significa GND em um circuito?", options: ["Ground, referência de 0 V", "Generic Network Driver", "Gate Negative Drain", "Ganho Negativo Digital"], correctIndex: 0, explanation: "GND (ground/terra) é o nó de referência 0V do circuito. Todos os GNDs devem estar conectados." },
+  { id: "el-06", text: "Em qual sentido a corrente convencional flui em um LED?", options: ["Do catodo para o anodo", "Do anodo para o catodo", "Em ambos os sentidos", "Não importa"], correctIndex: 1, explanation: "LED é um diodo: conduz no sentido anodo (perna longa) → catodo (perna curta, lado chanfrado)." },
+  { id: "el-07", text: "Dois resistores de 100 Ω em série equivalem a:", options: ["50 Ω", "100 Ω", "150 Ω", "200 Ω"], correctIndex: 3, explanation: "Em série, resistências se somam: 100 + 100 = 200 Ω." },
+  { id: "el-08", text: "Dois resistores iguais de 100 Ω em paralelo equivalem a:", options: ["50 Ω", "100 Ω", "150 Ω", "200 Ω"], correctIndex: 0, explanation: "Em paralelo, R_eq = R/n para resistores iguais: 100/2 = 50 Ω." },
+  { id: "el-09", text: "As faixas de cor marrom-preto-vermelho-dourado em um resistor indicam:", options: ["100 Ω, 5%", "1 kΩ, 5%", "10 kΩ, 5%", "100 kΩ, 5%"], correctIndex: 1, explanation: "Marrom=1, Preto=0, Vermelho=×100. Logo 10×100=1000Ω=1kΩ. Dourado=tolerância 5%." },
+  { id: "el-10", text: "Para que serve um capacitor de desacoplamento (geralmente 100nF) junto ao Vcc de um CI?", options: ["Aumentar a tensão", "Filtrar ruído de alta frequência", "Limitar a corrente", "Inverter a polaridade"], correctIndex: 1, explanation: "Ele desvia ruído de alta frequência para GND, mantendo a alimentação do chip estável." },
+  { id: "el-11", text: "Capacitor eletrolítico tem polaridade?", options: ["Sim, sempre", "Não, nunca", "Só acima de 100V", "Só em circuitos DC"], correctIndex: 0, explanation: "Eletrolíticos são polarizados: a perna mais curta é o negativo. Inverter pode explodir o componente." },
+  { id: "el-12", text: "Em um divisor de tensão com R1=1kΩ e R2=1kΩ alimentado por 5V, qual a tensão na saída (sobre R2)?", options: ["1,25 V", "2,5 V", "3,3 V", "5 V"], correctIndex: 1, explanation: "Vout = Vin × R2/(R1+R2) = 5 × 1/(1+1) = 2,5 V." },
+  { id: "el-13", text: "Qual a função de um resistor de pull-up?", options: ["Aumentar a tensão da fonte", "Garantir nível alto (HIGH) quando o pino não está sendo acionado", "Aumentar a corrente do circuito", "Proteger contra curto-circuito"], correctIndex: 1, explanation: "Pull-up mantém o pino em HIGH por padrão; o botão/sensor o puxa para LOW quando acionado." },
+  { id: "el-14", text: "O que acontece se você conectar diretamente os polos + e − de uma bateria sem carga?", options: ["Nada, é seguro", "Curto-circuito: corrente altíssima, aquecimento e possível dano", "A bateria desliga sozinha", "Apenas reduz a vida útil em 1%"], correctIndex: 1, explanation: "Curto-circuito gera corrente próxima ao máximo da fonte; pode esquentar, vazar ou pegar fogo em Li-Ion." },
+  { id: "el-15", text: "Potência elétrica (P) em watts é calculada por:", options: ["P = V × I", "P = V / I", "P = V + I", "P = V − I"], correctIndex: 0, explanation: "P = V × I. Em corrente contínua e resistiva pura essa fórmula é exata." },
+  { id: "el-16", text: "Qual ferramenta mede tensão, corrente e resistência?", options: ["Osciloscópio", "Multímetro", "Wattímetro", "Frequencímetro"], correctIndex: 1, explanation: "Multímetro digital faz as 3 medidas básicas (e geralmente continuidade e teste de diodo)." },
+  { id: "el-17", text: "Para medir corrente com multímetro, a ponteira deve ser conectada:", options: ["Em paralelo ao componente", "Em série com o componente", "Direto na bateria", "Em GND"], correctIndex: 1, explanation: "Amperímetro vai em série — a corrente passa por dentro dele. Em paralelo causa curto." },
+  { id: "el-18", text: "Tensão de 110V AC residencial significa que:", options: ["A tensão é constante em 110V", "É o valor de pico", "É o valor RMS (eficaz); o pico é ~155V", "É o valor mínimo"], correctIndex: 2, explanation: "AC alterna: 110V RMS é o valor eficaz. Pico ≈ Vrms × √2 ≈ 155V." },
+  { id: "el-19", text: "Diodo retificador é usado para:", options: ["Converter AC em DC pulsante", "Aumentar a tensão", "Reduzir a corrente", "Filtrar ruído"], correctIndex: 0, explanation: "Diodo conduz só em um sentido. Em retificador, ele converte alternada em contínua pulsante." },
+  { id: "el-20", text: "Para qual finalidade se coloca um diodo em paralelo (invertido) com a bobina de um relé?", options: ["Acender LED indicador", "Proteger o transistor de driver contra picos de tensão (flyback)", "Diminuir o som do clique", "Aumentar a corrente da bobina"], correctIndex: 1, explanation: "Diodo flyback (1N4007 típico) absorve o pico reverso gerado quando a corrente na bobina é cortada." },
+  { id: "el-21", text: "Transistor NPN funciona como:", options: ["Resistor variável", "Chave eletrônica controlada por corrente na base", "Capacitor", "Diodo bidirecional"], correctIndex: 1, explanation: "NPN: pequena corrente na base permite passagem de corrente maior entre coletor e emissor." },
+  { id: "el-22", text: "Qual a função de um fusível?", options: ["Aumentar a tensão", "Romper o circuito quando a corrente excede o valor nominal, protegendo equipamentos", "Filtrar interferência", "Estabilizar a corrente"], correctIndex: 1, explanation: "Fusível queima propositalmente sob sobrecorrente, interrompendo o circuito antes de danificar o resto." },
+  { id: "el-23", text: "PWM (Pulse Width Modulation) controla a potência média variando:", options: ["A frequência do sinal", "A amplitude da tensão", "O ciclo de trabalho (duty cycle)", "A polaridade"], correctIndex: 2, explanation: "PWM mantém frequência constante e varia o tempo em HIGH (duty cycle), simulando tensão média." },
+  { id: "el-24", text: "Para alimentar um motor DC pelo microcontrolador, você deve:", options: ["Conectar direto ao pino digital", "Usar um driver/ponte H ou transistor com fonte separada", "Usar uma resistência em série", "Conectar 5V direto"], correctIndex: 1, explanation: "Motor consome muito mais corrente que um pino I/O suporta (típico 20mA). Sempre usar driver." },
+  { id: "el-25", text: "O que é \"corrente de fuga\" em um componente?", options: ["Corrente desejada de funcionamento", "Corrente parasita pequena que flui mesmo quando o componente \"está desligado\"", "Corrente de curto-circuito", "Corrente alternada"], correctIndex: 1, explanation: "Componentes reais nunca isolam 100%. Em sensores de bateria, a fuga limita autonomia." },
+  { id: "el-26", text: "Tensão de 3,3V e 5V se misturam livremente em um circuito digital?", options: ["Sim, sem problema", "Não — aplicar 5V em pino 3,3V pode danificar o chip; use level shifter", "Só se forem do mesmo fabricante", "Apenas em circuitos analógicos"], correctIndex: 1, explanation: "ESP32 e Raspberry Pi são 3,3V. Conectar 5V neles sem level shifter (ou divisor) pode queimá-los." },
+  { id: "el-27", text: "Para que serve uma protoboard?", options: ["Soldar componentes definitivamente", "Montar circuitos temporariamente sem solda", "Programar microcontroladores", "Medir tensão"], correctIndex: 1, explanation: "Protoboard permite prototipagem rápida; linhas internas conectam furos para teste sem solda." },
+  { id: "el-28", text: "Cabo USB padrão fornece nominalmente:", options: ["3,3 V", "5 V", "9 V", "12 V"], correctIndex: 1, explanation: "USB clássico fornece 5V. USB-PD pode negociar tensões maiores (9V, 12V, 20V)." },
+  { id: "el-29", text: "Bateria 18650 Li-Ion típica tem tensão nominal de:", options: ["1,2 V", "3,7 V", "5 V", "9 V"], correctIndex: 1, explanation: "Li-Ion 18650: nominal 3,7V, cheia 4,2V, descarregada 3,0V (não descer disso para preservar)." },
+  { id: "el-30", text: "Por que NÃO se deve mexer em circuitos ligados na rede 110V/220V sem treinamento?", options: ["Pode dar pequeno choque incômodo", "Risco de choque que pode causar fibrilação cardíaca e morte; sempre desligue o disjuntor antes", "Pode descarregar o capacitor da fonte", "Pode queimar o multímetro"], correctIndex: 1, explanation: "Tensão da rede mata. Corrente de ~30 mA atravessando o tórax já pode causar fibrilação ventricular." },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
+// Trilha 2 — Arduino do Zero
+// ───────────────────────────────────────────────────────────────────────────
+const ARDUINO: Question[] = [
+  { id: "ar-01", text: "Qual é a função obrigatória que roda UMA vez ao iniciar o Arduino?", options: ["loop()", "setup()", "main()", "init()"], correctIndex: 1, explanation: "setup() executa uma vez ao ligar/resetar. loop() executa repetidamente em seguida." },
+  { id: "ar-02", text: "A função loop() em Arduino:", options: ["Executa uma vez e termina", "Executa repetidamente, indefinidamente", "Só roda se chamada manualmente", "Roda em paralelo a setup()"], correctIndex: 1, explanation: "Loop é o coração de qualquer sketch — assim que termina, recomeça do início." },
+  { id: "ar-03", text: "Para configurar o pino 13 como saída digital, escrevemos:", options: ["pinMode(13, INPUT);", "pinMode(13, OUTPUT);", "digitalWrite(13, OUTPUT);", "setPin(13, true);"], correctIndex: 1, explanation: "pinMode define se o pino é entrada (INPUT/INPUT_PULLUP) ou saída (OUTPUT). Geralmente em setup()." },
+  { id: "ar-04", text: "Para acender um LED no pino 13:", options: ["digitalWrite(13, HIGH);", "analogWrite(13, ON);", "pinMode(13, HIGH);", "Serial.write(13, HIGH);"], correctIndex: 0, explanation: "digitalWrite envia HIGH (≈Vcc) ou LOW (0V). Precisa ter feito pinMode OUTPUT antes." },
+  { id: "ar-05", text: "Qual valor delay(1000) espera?", options: ["1 milissegundo", "1 segundo", "1 minuto", "1 microssegundo"], correctIndex: 1, explanation: "delay() recebe milissegundos. 1000 ms = 1 s. Para microssegundos use delayMicroseconds()." },
+  { id: "ar-06", text: "Qual o problema de usar delay() em projetos complexos?", options: ["Consome muita energia", "Bloqueia o processador, impedindo outras leituras simultâneas", "Não é preciso", "Não funciona em ESP32"], correctIndex: 1, explanation: "Durante delay() nada mais acontece. Use millis() para multitarefa cooperativa." },
+  { id: "ar-07", text: "Para ler um botão conectado ao pino 2, configurado como entrada com resistor pull-up interno:", options: ["pinMode(2, INPUT);", "pinMode(2, OUTPUT_PULLUP);", "pinMode(2, INPUT_PULLUP);", "pinMode(2, BUTTON);"], correctIndex: 2, explanation: "INPUT_PULLUP ativa o resistor interno (~20-50kΩ). O botão deve ir do pino para GND." },
+  { id: "ar-08", text: "Botão com INPUT_PULLUP retorna qual valor quando NÃO está pressionado?", options: ["HIGH (1)", "LOW (0)", "Aleatório", "Depende da temperatura"], correctIndex: 0, explanation: "Pull-up mantém o pino em HIGH. Quando pressionado, o pino é puxado para GND = LOW (lógica invertida)." },
+  { id: "ar-09", text: "analogRead(A0) retorna um valor entre:", options: ["0 e 255", "0 e 1023", "0 e 4095", "0 e 65535"], correctIndex: 1, explanation: "ADC do Arduino Uno é de 10 bits: 2^10 = 1024 níveis (0 a 1023). ESP32 é 12 bits (0 a 4095)." },
+  { id: "ar-10", text: "analogWrite() em um pino com ~ na placa Arduino Uno gera:", options: ["Tensão analógica real (DAC)", "Sinal PWM (digital pulsante)", "Sinal senoidal", "Pulso único"], correctIndex: 1, explanation: "Uno não tem DAC. analogWrite() gera PWM. Para tensão analógica real precisa de DAC externo ou filtro RC." },
+  { id: "ar-11", text: "O valor de analogWrite() varia entre:", options: ["0 e 100", "0 e 255", "0 e 1023", "0 e 4095"], correctIndex: 1, explanation: "8 bits de resolução PWM: 0 (sempre LOW) a 255 (sempre HIGH). 127 = 50% duty cycle." },
+  { id: "ar-12", text: "Para enviar dados ao monitor serial, primeiro precisamos chamar:", options: ["Serial.start()", "Serial.begin(9600);", "Serial.open(9600);", "Serial.init();"], correctIndex: 1, explanation: "Serial.begin(baudRate) inicia a comunicação. 9600 ou 115200 são os baud rates mais comuns." },
+  { id: "ar-13", text: "O baud rate do monitor serial precisa:", options: ["Ser sempre 9600", "Bater com o valor usado em Serial.begin()", "Ser 0 para autodetectar", "Ser sempre 115200"], correctIndex: 1, explanation: "Se baud rate do monitor ≠ do sketch, texto vem como caracteres aleatórios." },
+  { id: "ar-14", text: "Qual a diferença entre Serial.print() e Serial.println()?", options: ["Nenhuma", "println adiciona quebra de linha ao final", "print é mais rápido", "println só imprime números"], correctIndex: 1, explanation: "println adiciona \\r\\n no fim. print não adiciona nada." },
+  { id: "ar-15", text: "Qual tipo de dado ocupa menos memória RAM no Arduino Uno?", options: ["int (2 bytes)", "long (4 bytes)", "byte (1 byte)", "float (4 bytes)"], correctIndex: 2, explanation: "byte armazena 0-255 em 1 byte. Útil em Uno que tem só 2KB de SRAM." },
+  { id: "ar-16", text: "Para incluir uma biblioteca chamada Servo, escrevemos:", options: ["#include <Servo.h>", "import Servo;", "using Servo;", "require('Servo')"], correctIndex: 0, explanation: "Sintaxe C/C++ é #include <NomeDaLib.h>. As < > buscam em bibliotecas do sistema/IDE." },
+  { id: "ar-17", text: "Como declarar uma constante global para o pino do LED?", options: ["const int LED_PIN = 13;", "let LED_PIN = 13;", "var LED_PIN = 13;", "#const LED_PIN 13"], correctIndex: 0, explanation: "Em C++, const int torna a variável imutável. Alternativa equivalente é #define LED_PIN 13." },
+  { id: "ar-18", text: "Função millis() retorna:", options: ["Hora atual em ms desde 1970", "Milissegundos desde que o Arduino ligou", "Tempo restante de delay()", "Tempo do próximo loop"], correctIndex: 1, explanation: "millis() retorna unsigned long com ms desde o boot. Estoura (overflow) em ~49 dias." },
+  { id: "ar-19", text: "Para piscar um LED a cada 1 segundo SEM bloquear o loop com delay(), usamos:", options: ["delay(1000) mais rápido", "millis() comparando com último timestamp", "interrupt timer manual", "while(true)"], correctIndex: 1, explanation: "Padrão: `if (millis() - last >= 1000) { last = millis(); toggle(); }`. Não bloqueia outras tarefas." },
+  { id: "ar-20", text: "Qual operador em C++ verifica IGUALDADE de valores?", options: ["=", "==", "===", ":="], correctIndex: 1, explanation: "= atribui; == compara. Usar = em condição é um bug comum (warning do compilador)." },
+  { id: "ar-21", text: "Como criar um array de 5 inteiros chamado leituras?", options: ["int leituras[5];", "array<int> leituras(5);", "int leituras = [5];", "new int[5] leituras;"], correctIndex: 0, explanation: "Sintaxe C: tipo nome[tamanho]. Índices vão de 0 a tamanho-1 (leituras[0] até leituras[4])." },
+  { id: "ar-22", text: "Quantos bytes ocupa uma variável \"int\" em Arduino Uno (AVR)?", options: ["1", "2", "4", "8"], correctIndex: 1, explanation: "Em AVR (Uno/Nano/Mega), int é 16 bits = 2 bytes. Em ESP32/Due int é 32 bits = 4 bytes." },
+  { id: "ar-23", text: "Para fazer upload do sketch é necessário:", options: ["Apenas compilar", "Selecionar placa e porta corretas, então clicar em Upload", "Reiniciar o computador", "Desconectar a alimentação externa"], correctIndex: 1, explanation: "Tools → Board: escolha a placa certa; Tools → Port: escolha a USB. Upload (seta →) faz compilar + flash." },
+  { id: "ar-24", text: "Erro \"avrdude: stk500_recv(): programmer is not responding\" geralmente significa:", options: ["Sintaxe inválida", "Porta serial errada, cabo ruim ou placa não detectada", "Falta de memória", "Falha no compilador"], correctIndex: 1, explanation: "É erro de comunicação com o bootloader. Confira porta, cabo USB (alguns são só de carga) e placa." },
+  { id: "ar-25", text: "Para usar variável compartilhada entre setup/loop e uma ISR (interrupção), ela deve ser:", options: ["static", "volatile", "const", "extern"], correctIndex: 1, explanation: "volatile impede que o compilador otimize a leitura — o valor pode mudar a qualquer momento dentro da ISR." },
+  { id: "ar-26", text: "Map() converte uma faixa de valores em outra. map(512, 0, 1023, 0, 255) retorna:", options: ["64", "127", "255", "512"], correctIndex: 1, explanation: "Proporção linear: 512/1023 ≈ 0,5 → 0,5 × 255 ≈ 127." },
+  { id: "ar-27", text: "Onde escrever inicialização de bibliotecas (ex: lcd.begin())?", options: ["Antes de setup()", "Dentro de setup()", "Dentro de loop()", "Em uma ISR"], correctIndex: 1, explanation: "setup() roda uma vez no boot — local certo para inicializar hardware e bibliotecas." },
+  { id: "ar-28", text: "Pinos digitais do Arduino Uno aguentam corrente máxima de aproximadamente:", options: ["1 mA", "20 mA por pino (limite recomendado)", "200 mA", "1 A"], correctIndex: 1, explanation: "Spec: 40mA absoluto, mas o seguro é ≤20mA por pino. Para motores, relés, fitas LED — use driver." },
+  { id: "ar-29", text: "Como reiniciar o Arduino por software?", options: ["pinMode(0, RESET);", "Não é possível", "Chamar a função reset() — ou usar watchdog timer", "Serial.end()"], correctIndex: 2, explanation: "Em AVR usa-se WDT (Watchdog) ou jumping para endereço 0. ESP32 tem ESP.restart() nativo." },
+  { id: "ar-30", text: "Qual a vantagem do ESP32 sobre o Arduino Uno?", options: ["Mais pinos digitais", "Wi-Fi e Bluetooth integrados, mais memória, CPU dual-core de 32 bits", "Maior tensão de operação", "Suporte a 5V em todos os pinos"], correctIndex: 1, explanation: "ESP32 é 3,3V, mas tem conectividade, mais RAM/Flash e processador muito mais rápido (240MHz dual-core)." },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
+// Trilha 3 — Sensores e Atuadores
+// ───────────────────────────────────────────────────────────────────────────
+const SENSORES: Question[] = [
+  { id: "se-01", text: "Sensor DHT22 mede:", options: ["Apenas temperatura", "Apenas umidade", "Temperatura e umidade", "Pressão atmosférica"], correctIndex: 2, explanation: "DHT22 mede temperatura (-40 a +80°C) e umidade relativa (0-100%) com precisão melhor que DHT11." },
+  { id: "se-02", text: "Sensor ultrassônico HC-SR04 mede distância usando:", options: ["Luz infravermelha", "Eco de onda sonora de 40 kHz", "Campo magnético", "Capacitância"], correctIndex: 1, explanation: "Envia pulso ultrassônico (Trig) e mede o tempo até o eco (Echo). Distância = (tempo × velocidade do som) / 2." },
+  { id: "se-03", text: "Os pinos principais do HC-SR04 são:", options: ["VCC, GND, Trig, Echo", "VCC, GND, SDA, SCL", "VCC, GND, MOSI, MISO", "VCC, GND, TX, RX"], correctIndex: 0, explanation: "Trig recebe pulso de disparo (10µs); Echo devolve pulso de largura proporcional à distância." },
+  { id: "se-04", text: "Para acionar um relé pelo Arduino, o pino do microcontrolador conecta-se a:", options: ["Diretamente nos contatos AC do relé", "No pino IN do módulo relé (que tem optoacoplador e transistor)", "Em paralelo com a bobina", "No GND do relé"], correctIndex: 1, explanation: "Módulo relé tem driver e proteção. Conectar direto na bobina queima o pino do MCU." },
+  { id: "se-05", text: "Servo motor é controlado por:", options: ["Tensão DC variável", "Sinal PWM de aproximadamente 50 Hz", "Comunicação I2C", "Sinal de áudio"], correctIndex: 1, explanation: "Servo lê pulsos a cada 20ms (~50Hz). Largura de pulso de 1ms = 0°, 2ms = 180°." },
+  { id: "se-06", text: "Para usar Servo no Arduino, qual biblioteca incluir?", options: ["#include <DHT.h>", "#include <Servo.h>", "#include <Wire.h>", "#include <SPI.h>"], correctIndex: 1, explanation: "Servo.h é nativa da IDE Arduino. Use myservo.attach(pino) e myservo.write(angulo)." },
+  { id: "se-07", text: "I2C usa quais dois pinos para comunicação?", options: ["TX e RX", "MOSI e MISO", "SDA (dados) e SCL (clock)", "Trig e Echo"], correctIndex: 2, explanation: "I2C é um bus de 2 fios + GND comum. Permite vários dispositivos endereçados (até 127 endereços de 7 bits)." },
+  { id: "se-08", text: "No barramento I2C, geralmente é necessário:", options: ["Cristal externo", "Resistores de pull-up em SDA e SCL (tipicamente 4,7kΩ)", "Transistor em paralelo", "Fonte separada para cada dispositivo"], correctIndex: 1, explanation: "I2C é open-drain — sem pull-ups, as linhas nunca sobem para HIGH. Módulos pequenos já trazem pull-ups internos." },
+  { id: "se-09", text: "MPU6050 é um sensor:", options: ["De temperatura e pressão", "De distância", "Acelerômetro + giroscópio (6 eixos)", "De gás"], correctIndex: 2, explanation: "3 eixos de acelerômetro + 3 de giroscópio = 6 graus de liberdade. Comunicação por I2C. Usado em IMU/drones." },
+  { id: "se-10", text: "SPI é mais rápido que I2C porque:", options: ["Usa menos fios", "Usa clock dedicado e linhas separadas para envio/recepção (full-duplex)", "É sem fio", "Não tem clock"], correctIndex: 1, explanation: "SPI tem 4 fios (MOSI, MISO, SCK, CS) e full-duplex. I2C compartilha SDA bidirecional, half-duplex." },
+  { id: "se-11", text: "Buzzer ativo difere do passivo porque:", options: ["É mais barato", "Já tem oscilador interno — basta aplicar tensão para emitir tom", "Não emite som", "Precisa de bateria interna"], correctIndex: 1, explanation: "Ativo: liga e apita em frequência fixa. Passivo: precisa de PWM/tone() para escolher a frequência." },
+  { id: "se-12", text: "Para gerar uma nota musical em buzzer passivo, usamos:", options: ["digitalWrite alternado", "tone(pino, frequencia, duracao);", "analogRead()", "delay()"], correctIndex: 1, explanation: "tone() gera onda quadrada na frequência indicada. noTone() para. tone() bloqueia outros pinos PWM." },
+  { id: "se-13", text: "Sensor PIR (HC-SR501) detecta:", options: ["Distância exata", "Movimento de corpos quentes (radiação IR)", "Cor", "Temperatura ambiente"], correctIndex: 1, explanation: "PIR detecta mudança de calor infravermelho no campo de visão. Saída digital simples HIGH/LOW." },
+  { id: "se-14", text: "LDR (foto-resistor) tem resistência que:", options: ["Aumenta com mais luz", "Diminui com mais luz", "Não varia", "Só funciona com luz UV"], correctIndex: 1, explanation: "LDR: escuro ≈ MΩ, iluminado ≈ centenas de Ω. Use em divisor de tensão para ler em analogRead()." },
+  { id: "se-15", text: "Sensor de temperatura DS18B20 usa qual protocolo?", options: ["I2C", "SPI", "1-Wire (um único fio de dados)", "UART"], correctIndex: 2, explanation: "1-Wire permite vários sensores no mesmo pino. Cada DS18B20 tem ID único de 64 bits." },
+  { id: "se-16", text: "MQ-2 é um sensor de:", options: ["Distância", "Gás (GLP, fumaça, metano)", "Som", "Cor"], correctIndex: 1, explanation: "MQ-2 detecta gases combustíveis. Precisa pré-aquecimento (~24h ideal) para leituras estáveis." },
+  { id: "se-17", text: "Para controlar um motor DC de pequeno porte com Arduino, o circuito típico inclui:", options: ["Apenas resistor", "Driver (L293D, L298N ou MOSFET) + fonte externa", "Conectar direto no pino digital", "Bateria 9V em paralelo"], correctIndex: 1, explanation: "Motor DC consome muito mais que 20mA. Driver isola o MCU e fornece a corrente da fonte separada." },
+  { id: "se-18", text: "Ponte H serve para:", options: ["Carregar baterias", "Inverter o sentido de rotação de um motor DC", "Aumentar a velocidade do clock", "Filtrar tensão"], correctIndex: 1, explanation: "Ponte H tem 4 transistores que invertem a polaridade aplicada ao motor, mudando o sentido." },
+  { id: "se-19", text: "Motor de passo difere de motor DC porque:", options: ["Não usa eletricidade", "Gira em passos discretos controlados, permitindo posicionamento preciso", "É sempre mais rápido", "Não precisa de driver"], correctIndex: 1, explanation: "Stepper gira N graus por pulso. Excelente para impressoras 3D, CNC, scanners — onde precisão importa." },
+  { id: "se-20", text: "Encoder rotativo (KY-040) entrega:", options: ["Apenas posição absoluta", "Pulsos em duas linhas (A e B) que indicam direção e quantidade de rotação", "Sinal analógico", "Áudio"], correctIndex: 1, explanation: "Por estar 90° defasadas (quadratura), A e B indicam sentido de giro além do número de passos." },
+  { id: "se-21", text: "Para evitar leituras falsas de botão (bouncing mecânico), aplicamos:", options: ["Mais delay()", "Debounce: ignorar mudanças muito rápidas (ex: 50ms) ou hardware com capacitor", "Pull-up de 10kΩ apenas", "Resistor de 220Ω"], correctIndex: 1, explanation: "Botões mecânicos \"trepidam\" milissegundos ao fechar contato. Debounce filtra essas leituras espúrias." },
+  { id: "se-22", text: "Display OLED I2C 128x64 (SSD1306) conecta-se ao Arduino por:", options: ["6 fios de dados paralelos", "4 fios: VCC, GND, SDA, SCL", "1 fio único", "16 fios"], correctIndex: 1, explanation: "I2C usa só 2 fios de dados + alimentação. Mais simples que LCD 16x2 paralelo (que precisa 6+ fios)." },
+  { id: "se-23", text: "Display LCD 16x2 com módulo I2C poupa fios porque:", options: ["Funciona sem alimentação", "Usa um expansor PCF8574 internamente para comandar os 6 pinos do LCD via I2C", "É menor", "Não tem backlight"], correctIndex: 1, explanation: "Sem módulo I2C, LCD 16x2 ocupa 6 pinos do MCU. Com módulo I2C, só 2 pinos (SDA/SCL)." },
+  { id: "se-24", text: "Para acender uma fita de LED endereçável WS2812B, usa-se:", options: ["analogWrite simples", "Biblioteca FastLED/Adafruit_NeoPixel, controlando timing preciso de bits", "Apenas tensão DC", "Multiplexador externo"], correctIndex: 1, explanation: "WS2812B usa protocolo serial com timing ~800kbps. Bibliotecas geram esses pulsos com precisão." },
+  { id: "se-25", text: "Sensor de chuva FC-37 é, na prática:", options: ["Um GPS", "Duas trilhas condutoras: a água diminui a resistência entre elas", "Um acelerômetro", "Um sensor de temperatura"], correctIndex: 1, explanation: "Quando molha, a água conduz e diminui a resistência. Saída analógica indica intensidade." },
+  { id: "se-26", text: "Para enviar dados do ESP32 para um servidor pela internet, usamos:", options: ["delay()", "Biblioteca WiFi.h + HTTPClient.h (ou MQTT)", "I2C", "PWM"], correctIndex: 1, explanation: "WiFi.h conecta à rede; HTTPClient/MQTT fazem requisições HTTP ou pub/sub para nuvem." },
+  { id: "se-27", text: "BMP280 é um sensor de:", options: ["Distância", "Movimento", "Pressão atmosférica (e temperatura)", "Som"], correctIndex: 2, explanation: "BMP280 mede pressão e temperatura. A partir da pressão dá pra estimar altitude (~1m de resolução)." },
+  { id: "se-28", text: "Cartão microSD acoplado por módulo SPI no Arduino é usado para:", options: ["Aumentar a velocidade do clock", "Armazenar logs, arquivos de áudio, datasets grandes", "Substituir o microcontrolador", "Aumentar a tensão"], correctIndex: 1, explanation: "Microcontroladores têm pouca Flash. SD permite gigabytes de armazenamento via biblioteca SD.h." },
+  { id: "se-29", text: "Em projetos com bateria, para reduzir consumo do ESP32, usamos:", options: ["Aumentar o clock", "Modo deep sleep (consumo cai para ~10µA), acordando por timer ou GPIO", "Mais delays", "Desligar a antena Wi-Fi por software apenas"], correctIndex: 1, explanation: "Deep sleep desliga quase tudo. esp_sleep_enable_timer_wakeup() e esp_deep_sleep_start() acionam." },
+  { id: "se-30", text: "Para ler temperatura do DS18B20 no Arduino, qual combinação de bibliotecas é típica?", options: ["DHT.h + Servo.h", "OneWire.h + DallasTemperature.h", "Wire.h + I2C.h", "SoftwareSerial.h"], correctIndex: 1, explanation: "OneWire trata o protocolo de 1 fio; DallasTemperature converte registradores em °C/°F." },
+];
+
+export const QUESTIONS: Record<Trilha, Question[]> = {
+  eletronica: ELETRONICA,
+  arduino: ARDUINO,
+  sensores: SENSORES,
 };

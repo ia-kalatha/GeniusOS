@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { User } from "../App";
 import { DATA_PLACAS, DATA_COMPONENTES, DATA_PC_HARDWARE, HardwareItem } from "../data/hardware";
 import { PROJECTS, Project } from "../data/projects";
-import { QUESTIONS, Question, Subject, Level } from "../data/questions";
+import { QUESTIONS, TRILHA_INFO, Question, Trilha } from "../data/questions";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
@@ -56,15 +56,19 @@ interface ChatMessage {
   content: string;
 }
 
-interface SubjectProgress {
-  componentes: number | null;
-  placas: number | null;
-  js: number | null;
-  cpp: number | null;
-  final: boolean;
+// Progresso por trilha: melhor pontuação e se concluiu com 100% (perfeito).
+interface TrilhaProgress {
+  best: number | null;
+  completed: boolean;
 }
 
-type TestProgress = Record<Level, SubjectProgress>;
+type TestProgress = Record<Trilha, TrilhaProgress>;
+
+const DEFAULT_TEST_PROGRESS: TestProgress = {
+  eletronica: { best: null, completed: false },
+  arduino: { best: null, completed: false },
+  sensores: { best: null, completed: false },
+};
 
 const THEMES = {
   kernel: { bg: "neutral-950", accent: "cyan-400", font: "font-sans" },
@@ -107,15 +111,17 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
     status: "Online"
   });
 
-  // Provas Progress
+  // Provas Progress — key v3 marca a migração para a estrutura por trilha temática.
   const [testProgress, setTestProgress] = useState<TestProgress>(() => {
-    const saved = user ? localStorage.getItem(`tests_v2_${user.username}`) : null;
-    const defaultProgress = {
-      basico: { componentes: null, placas: null, js: null, cpp: null, final: false },
-      intermediario: { componentes: null, placas: null, js: null, cpp: null, final: false },
-      pro: { componentes: null, placas: null, js: null, cpp: null, final: false }
-    };
-    return saved ? JSON.parse(saved) : defaultProgress;
+    const saved = user ? localStorage.getItem(`tests_v3_${user.username}`) : null;
+    if (!saved) return DEFAULT_TEST_PROGRESS;
+    try {
+      const parsed = JSON.parse(saved);
+      // Mescla defaults para garantir todas as trilhas mesmo se localStorage estiver parcial.
+      return { ...DEFAULT_TEST_PROGRESS, ...parsed };
+    } catch {
+      return DEFAULT_TEST_PROGRESS;
+    }
   });
 
   useEffect(() => {
@@ -138,16 +144,19 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
     }
   };
 
-  const updateProgress = (level: Level, subject: Subject, score: number | boolean) => {
+  const updateProgress = (trilha: Trilha, score: number, total: number) => {
     if (!user) return;
-    const newProgress = { ...testProgress };
-    if (subject === "final") {
-       newProgress[level].final = score as boolean;
-    } else {
-       newProgress[level][subject as keyof Omit<SubjectProgress, "final">] = score as number;
-    }
+    const previous = testProgress[trilha];
+    const newBest = previous.best === null ? score : Math.max(previous.best, score);
+    const newProgress: TestProgress = {
+      ...testProgress,
+      [trilha]: {
+        best: newBest,
+        completed: previous.completed || score === total,
+      },
+    };
     setTestProgress(newProgress);
-    localStorage.setItem(`tests_v2_${user.username}`, JSON.stringify(newProgress));
+    localStorage.setItem(`tests_v3_${user.username}`, JSON.stringify(newProgress));
   };
 
   // IA - Workspace Compilation
@@ -1757,41 +1766,30 @@ function CodeBlock({ title, lang, code }: any) {
   );
 }
 
-function ProvasView({ progress, onComplete }: { 
-  progress: TestProgress, 
-  onComplete: (l: Level, s: Subject, res: number | boolean) => void
+function ProvasView({ progress, onComplete }: {
+  progress: TestProgress,
+  onComplete: (trilha: Trilha, score: number, total: number) => void
 }) {
-  const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
-  const [activeLevel, setActiveLevel] = useState<Level>("basico");
-  const [showStats, setShowStats] = useState(false);
+  const [activeTrilha, setActiveTrilha] = useState<Trilha | null>(null);
 
-  const subjects: { id: Subject; label: string; desc: string; icon: any; size: number }[] = [
-    { id: "componentes", label: "Eletrônica Básica", desc: "Teste de identificação de componentes e resistores.", icon: Layers, size: 30 },
-    { id: "placas", label: "Microcontroladores", desc: "Especificações de Arduino, ESP e Raspberry Pi.", icon: Cpu, size: 30 },
-    { id: "js", label: "Lógica JavaScript", desc: "Sintaxe, arrays, objetos e manipulação de dados.", icon: Code, size: 30 },
-    { id: "cpp", label: "C++ para Hardware", desc: "Registradores, ponteiros e controle de pinagem.", icon: Terminal, size: 30 },
-    { id: "final", label: "Avaliação Final", desc: "O desafio supremo envolvendo todo o conteúdo.", icon: Trophy, size: 40 },
+  const trilhas: { id: Trilha; icon: any }[] = [
+    { id: "eletronica", icon: Layers },
+    { id: "arduino", icon: Cpu },
+    { id: "sensores", icon: Activity },
   ];
 
-  const currentProgress = progress[activeLevel];
-  const totalCorrect = Object.values(currentProgress).reduce((acc, val) => acc + (typeof val === "number" ? val : 0), 0);
-  const canAccessFinal = totalCorrect >= 50;
-  const maxCorrectPossible = 120; // 30 * 4
-  const overallProgress = (totalCorrect / maxCorrectPossible) * 100;
+  const totalQuestions = trilhas.reduce((acc, t) => acc + QUESTIONS[t.id].length, 0);
+  const totalBest = trilhas.reduce((acc, t) => acc + (progress[t.id].best || 0), 0);
+  const overallPercent = (totalBest / totalQuestions) * 100;
 
-  if (activeSubject) {
+  if (activeTrilha) {
     return (
-      <TestInstance 
-        subject={activeSubject} 
-        level={activeLevel}
-        onClose={() => setActiveSubject(null)} 
+      <TestInstance
+        trilha={activeTrilha}
+        onClose={() => setActiveTrilha(null)}
         onFinish={(score, total) => {
-          if (activeSubject === "final") {
-             if (score === total) onComplete(activeLevel, "final", true);
-          } else {
-             onComplete(activeLevel, activeSubject, score);
-          }
-          setActiveSubject(null);
+          onComplete(activeTrilha, score, total);
+          setActiveTrilha(null);
         }}
       />
     );
@@ -1802,111 +1800,62 @@ function ProvasView({ progress, onComplete }: {
       <div className="text-center space-y-8">
         <div className="space-y-4">
           <h2 className="text-5xl font-black tracking-tighter uppercase">CENTRO DE <span className="text-cyan-400">CERTIFICAÇÃO</span></h2>
-          <p className="text-neutral-500 font-medium">Acertos totais desbloqueiam a Prova Final (Requer no mínimo 50 acertos totais no nível).</p>
+          <p className="text-neutral-500 font-medium max-w-xl mx-auto">Três trilhas com questões reais sobre eletrônica, Arduino e sensores. Cada questão mostra a explicação após a resposta.</p>
         </div>
 
-        {/* Level Switcher */}
-        <div className="flex justify-center">
-          <div className="bg-neutral-900 border border-white/5 p-1.5 rounded-[2rem] flex gap-2">
-            {(["basico", "intermediario", "pro"] as const).map((l) => (
-              <button
-                key={l}
-                onClick={() => setActiveLevel(l)}
-                className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                  activeLevel === l 
-                  ? "bg-white text-black shadow-xl scale-105" 
-                  : "text-neutral-500 hover:text-neutral-300"
-                }`}
-              >
-                {l === "basico" ? "Básico" : l === "intermediario" ? "Intermediário" : "Pro"}
-              </button>
-            ))}
-          </div>
-        </div>
-        
-        <div className="max-w-md mx-auto mt-8 cursor-pointer group" onClick={() => setShowStats(!showStats)}>
-           <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-3 group-hover:text-cyan-400 transition-colors">
-              <span>Performance {activeLevel.toUpperCase()}</span>
-              <span>{totalCorrect} / {maxCorrectPossible}</span>
+        <div className="max-w-md mx-auto">
+           <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-3">
+              <span>Sua performance geral</span>
+              <span>{totalBest} / {totalQuestions}</span>
            </div>
            <div className="h-3 bg-neutral-900 rounded-full border border-white/5 overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }} 
-                animate={{ width: `${overallProgress}%` }} 
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${overallPercent}%` }}
                 className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 shadow-[0_0_15px_#06b6d4]"
               />
            </div>
-           
-           <AnimatePresence>
-             {showStats && (
-               <motion.div 
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="mt-4 p-4 bg-white/5 border border-white/5 rounded-2xl text-left overflow-hidden"
-               >
-                 {subjects.filter(s => s.id !== "final").map(s => (
-                   <div key={s.id} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
-                      <span className="text-[10px] font-black uppercase text-neutral-500">{s.label}</span>
-                      <span className={`text-[10px] font-black ${currentProgress[s.id as keyof Omit<SubjectProgress, "final">] === s.size ? "text-emerald-500" : "text-white"}`}>
-                        {currentProgress[s.id as keyof Omit<SubjectProgress, "final">] || 0} / {s.size}
-                      </span>
-                   </div>
-                 ))}
-               </motion.div>
-             )}
-           </AnimatePresence>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {subjects.map((s) => {
-          const isLocked = s.id === "final" && !canAccessFinal;
-          const userScore = s.id === "final" ? (currentProgress.final ? 40 : null) : currentProgress[s.id as keyof Omit<SubjectProgress, "final">];
-          const isDone = userScore === s.size || (s.id === "final" && currentProgress.final);
-          
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {trilhas.map((t) => {
+          const info = TRILHA_INFO[t.id];
+          const tProgress = progress[t.id];
+          const size = QUESTIONS[t.id].length;
+          const isDone = tProgress.completed;
+          const userScore = tProgress.best;
+
           return (
             <button
-              key={s.id}
-              disabled={isLocked || isDone}
-              onClick={() => setActiveSubject(s.id)}
+              key={t.id}
+              onClick={() => setActiveTrilha(t.id)}
               className={`text-left p-8 rounded-[2.5rem] border transition-all relative overflow-hidden group ${
-                isDone 
-                ? "bg-emerald-500/5 border-emerald-500/20" 
-                : isLocked 
-                ? "bg-neutral-900/20 border-white/5 opacity-50 cursor-not-allowed" 
+                isDone
+                ? "bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40"
                 : "bg-neutral-900 border-white/10 hover:border-cyan-500/50 hover:bg-neutral-800"
               }`}
             >
               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${
-                isDone ? "bg-emerald-500/20 text-emerald-400" : isLocked ? "bg-neutral-950 text-neutral-700" : "bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform"
+                isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform"
               }`}>
-                {isLocked ? <Lock /> : isDone ? <CheckCircle2 /> : <s.icon />}
+                {isDone ? <CheckCircle2 /> : <t.icon />}
               </div>
 
               <h4 className={`text-xl font-black uppercase tracking-tighter mb-2 ${isDone ? "text-emerald-400" : "text-white"}`}>
-                {s.label}
+                {info.label}
               </h4>
-              <p className="text-neutral-500 text-xs font-medium leading-relaxed uppercase tracking-wider">{s.desc}</p>
-              
+              <p className="text-neutral-500 text-xs font-medium leading-relaxed">{info.desc}</p>
+
               <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
-                 <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest">{s.size} Questões</span>
+                 <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest">{size} questões</span>
                  {userScore !== null && (
                    <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${isDone ? "text-emerald-500" : "text-cyan-400"}`}>
                      {isDone ? <Trophy className="w-3 h-3" /> : null}
-                     Melhor: {userScore} acertos
+                     Melhor: {userScore} / {size}
                    </span>
                  )}
               </div>
-
-              {isLocked && (
-                <div className="absolute inset-0 bg-neutral-950/40 backdrop-blur-[2px] flex items-center justify-center">
-                   <div className="bg-neutral-900 px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3">
-                      <Lock className="w-3 h-3 text-red-500" />
-                      <span className="text-[8px] font-black uppercase tracking-widest text-red-400">Trancado</span>
-                   </div>
-                </div>
-              )}
             </button>
           );
         })}
@@ -2149,35 +2098,41 @@ function ProjectsView() {
   );
 }
 
-function TestInstance({ subject, level, onClose, onFinish }: { subject: Subject; level: Level; onClose: () => void; onFinish: (score: number, total: number) => void }) {
+function TestInstance({ trilha, onClose, onFinish }: { trilha: Trilha; onClose: () => void; onFinish: (score: number, total: number) => void }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  // revealed = usuário já confirmou a resposta dessa questão (mostramos correto/errado + explicação)
+  const [revealed, setRevealed] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
-  
-  const questions = QUESTIONS[level][subject];
+
+  const questions = QUESTIONS[trilha];
+  const trilhaLabel = TRILHA_INFO[trilha].label;
   const q = questions[currentIdx];
 
-  const handleNext = () => {
-    if (selectedIdx === null || transitioning) return;
-    
-    setTransitioning(true);
-    
-    setTimeout(() => {
-      const newAnswers = [...answers];
-      newAnswers[currentIdx] = selectedIdx;
-      setAnswers(newAnswers);
-      setSelectedIdx(null);
+  const handleConfirm = () => {
+    if (selectedIdx === null) return;
+    const newAnswers = [...answers];
+    newAnswers[currentIdx] = selectedIdx;
+    setAnswers(newAnswers);
+    setRevealed(true);
+  };
 
+  const handleNext = () => {
+    if (transitioning) return;
+    setTransitioning(true);
+
+    setTimeout(() => {
       if (currentIdx < questions.length - 1) {
         setCurrentIdx(currentIdx + 1);
-        setSelectedIdx(newAnswers[currentIdx + 1] ?? null);
+        setSelectedIdx(answers[currentIdx + 1] ?? null);
+        setRevealed(false);
       } else {
         setShowResult(true);
       }
       setTransitioning(false);
-    }, 1200); // Increased duration for full screen transition
+    }, 600);
   };
 
   const calculateScore = () => {
@@ -2224,50 +2179,23 @@ function TestInstance({ subject, level, onClose, onFinish }: { subject: Subject;
     );
   }
 
+  // Estilo de cada opção depende do estado revealed: cinza/cyan (selecionar) → verde/vermelho (revelado)
+  const getOptionClass = (i: number) => {
+    if (!revealed) {
+      return selectedIdx === i
+        ? "bg-cyan-500/10 border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.1)]"
+        : "bg-white/5 border-white/5 hover:border-white/20 hover:bg-white/10";
+    }
+    if (i === q.correctIndex) return "bg-emerald-500/10 border-emerald-500";
+    if (i === selectedIdx) return "bg-red-500/10 border-red-500";
+    return "bg-white/5 border-white/5 opacity-50";
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-12 pb-20 relative">
-      <AnimatePresence>
-        {transitioning && (
-          <motion.div 
-            initial={{ y: "100%" }}
-            animate={{ y: "0%" }}
-            exit={{ y: "-100%" }}
-            transition={{ duration: 1.2, ease: [0.87, 0, 0.13, 1] }}
-            className="fixed inset-0 z-[2000] bg-blue-600 flex items-center justify-center p-12"
-          >
-             <div className="flex flex-col items-center gap-12 text-center max-w-4xl">
-                <motion.div 
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 0.3, type: "spring" }}
-                  className="w-40 h-40 border-[12px] border-white/20 border-t-white rounded-full animate-spin shadow-[0_0_100px_rgba(255,255,255,0.2)]" 
-                />
-                <div className="space-y-6">
-                  <motion.h2 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                    className="text-8xl font-black text-white italic uppercase tracking-[-0.05em] leading-none"
-                  >
-                    PROCESSANDO <br/> <span className="text-neutral-950">CONHECIMENTO</span>
-                  </motion.h2>
-                  <motion.p 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 0.6 }}
-                    transition={{ delay: 0.8 }}
-                    className="text-white font-black uppercase tracking-[0.5em] text-sm"
-                  >
-                    SINCRONIZAÇÃO DEVGENIUS KERNEL V12...
-                  </motion.p>
-                </div>
-             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="flex items-center justify-between">
         <button onClick={onClose} className="text-neutral-500 hover:text-white flex items-center gap-3 text-xs font-black uppercase tracking-widest transition-colors">
-          <X className="w-4 h-4" /> ABANDONAR
+          <X className="w-4 h-4" /> SAIR DA TRILHA
         </button>
         <div className="text-right">
            <p className="text-[10px] font-black text-neutral-600 uppercase tracking-widest mb-1">Questão {currentIdx + 1} de {questions.length}</p>
@@ -2277,14 +2205,13 @@ function TestInstance({ subject, level, onClose, onFinish }: { subject: Subject;
         </div>
       </div>
 
-      <div className="relative group/test flex gap-8 items-start">
-        <div className="flex-1 bg-neutral-900 border border-white/10 rounded-[3rem] p-12 shadow-2xl space-y-12 min-h-[500px]">
+      <div className="relative flex gap-8 items-start">
+        <div className="flex-1 bg-neutral-900 border border-white/10 rounded-[3rem] p-12 shadow-2xl space-y-10 min-h-[500px]">
            <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <span className="px-4 py-1.5 bg-cyan-500/10 border border-cyan-500/40 rounded-full text-[10px] font-black text-cyan-400 uppercase tracking-widest uppercase">
-                  Módulo {subject.toUpperCase()}
+                <span className="px-4 py-1.5 bg-cyan-500/10 border border-cyan-500/40 rounded-full text-[10px] font-black text-cyan-400 uppercase tracking-widest">
+                  {trilhaLabel}
                 </span>
-                <span className="text-[10px] font-black text-neutral-700 uppercase tracking-widest">Nível: {level.toUpperCase()}</span>
               </div>
               <h3 className="text-3xl font-black tracking-tight leading-tight text-white">{q.text}</h3>
            </div>
@@ -2293,59 +2220,81 @@ function TestInstance({ subject, level, onClose, onFinish }: { subject: Subject;
               {q.options.map((opt, i) => (
                 <button
                   key={i}
-                  disabled={transitioning}
+                  disabled={revealed || transitioning}
                   onClick={() => setSelectedIdx(i)}
-                  className={`w-full text-left p-6 rounded-2xl border transition-all flex items-center justify-between group ${
-                    selectedIdx === i 
-                    ? "bg-cyan-500/10 border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.1)]" 
-                    : "bg-white/5 border-white/5 hover:border-white/20 hover:bg-white/10"
-                  }`}
+                  className={`w-full text-left p-6 rounded-2xl border transition-all flex items-center justify-between group ${getOptionClass(i)}`}
                 >
                   <div className="flex items-center gap-6">
                      <div className={`w-10 h-10 rounded-xl border flex items-center justify-center font-black text-xs transition-colors ${
-                       selectedIdx === i ? "bg-cyan-500 border-cyan-400 text-black" : "bg-neutral-950 border-white/10 text-neutral-600 group-hover:text-white"
+                       revealed && i === q.correctIndex ? "bg-emerald-500 border-emerald-400 text-black"
+                       : revealed && i === selectedIdx ? "bg-red-500 border-red-400 text-black"
+                       : selectedIdx === i ? "bg-cyan-500 border-cyan-400 text-black"
+                       : "bg-neutral-950 border-white/10 text-neutral-600 group-hover:text-white"
                      }`}>
                         {String.fromCharCode(65 + i)}
                      </div>
-                     <span className={`text-sm font-bold transition-colors ${selectedIdx === i ? "text-white" : "text-neutral-300 group-hover:text-white"}`}>{opt}</span>
+                     <span className={`text-sm font-bold transition-colors ${selectedIdx === i || (revealed && i === q.correctIndex) ? "text-white" : "text-neutral-300 group-hover:text-white"}`}>{opt}</span>
                   </div>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                    selectedIdx === i ? "bg-cyan-500 border-cyan-400 scale-110" : "bg-transparent border-white/10"
-                  }`}>
-                    {selectedIdx === i && <CheckCircle2 className="w-4 h-4 text-black" />}
-                  </div>
+                  {revealed && i === q.correctIndex && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
+                  {revealed && i === selectedIdx && i !== q.correctIndex && <X className="w-5 h-5 text-red-400" />}
                 </button>
               ))}
            </div>
 
+           {revealed && (
+             <motion.div
+               initial={{ opacity: 0, y: 10 }}
+               animate={{ opacity: 1, y: 0 }}
+               className={`p-6 rounded-2xl border ${
+                 selectedIdx === q.correctIndex
+                   ? "bg-emerald-500/5 border-emerald-500/20"
+                   : "bg-red-500/5 border-red-500/20"
+               }`}
+             >
+               <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${selectedIdx === q.correctIndex ? "text-emerald-400" : "text-red-400"}`}>
+                 {selectedIdx === q.correctIndex ? "Resposta correta" : "Resposta incorreta"}
+               </p>
+               <p className="text-sm font-medium text-neutral-300 leading-relaxed">{q.explanation}</p>
+             </motion.div>
+           )}
+
            <div className="flex gap-4 pt-8 border-t border-white/5">
-              {currentIdx > 0 && (
+              {currentIdx > 0 && !revealed && (
                 <button
                   disabled={transitioning}
                   onClick={() => {
-                    const newAnswers = [...answers];
-                    if (selectedIdx !== null) newAnswers[currentIdx] = selectedIdx;
-                    setAnswers(newAnswers);
                     setCurrentIdx(currentIdx - 1);
-                    setSelectedIdx(newAnswers[currentIdx - 1] ?? null);
+                    setSelectedIdx(answers[currentIdx - 1] ?? null);
+                    setRevealed(answers[currentIdx - 1] !== undefined);
                   }}
                   className="flex-1 h-16 rounded-2xl border border-white/5 bg-white/5 text-neutral-400 hover:text-white hover:bg-white/10 font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all"
                 >
                   <ChevronRight className="w-4 h-4 rotate-180" /> VOLTAR
                 </button>
               )}
-              <button
-                disabled={selectedIdx === null || transitioning}
-                onClick={handleNext}
-                className={`flex-[2] h-16 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all ${
-                  selectedIdx !== null 
-                  ? "bg-cyan-500 text-neutral-950 shadow-xl hover:scale-[1.02] active:scale-[0.98]" 
-                  : "bg-neutral-800 text-neutral-600 cursor-not-allowed"
-                }`}
-              >
-                {currentIdx < questions.length - 1 ? "PRÓXIMA QUESTÃO" : "FINALIZAR TESTE"}
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              {!revealed ? (
+                <button
+                  disabled={selectedIdx === null || transitioning}
+                  onClick={handleConfirm}
+                  className={`flex-[2] h-16 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all ${
+                    selectedIdx !== null
+                    ? "bg-cyan-500 text-neutral-950 shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                    : "bg-neutral-800 text-neutral-600 cursor-not-allowed"
+                  }`}
+                >
+                  CONFIRMAR RESPOSTA
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  disabled={transitioning}
+                  onClick={handleNext}
+                  className="flex-[2] h-16 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 bg-cyan-500 text-neutral-950 shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  {currentIdx < questions.length - 1 ? "PRÓXIMA QUESTÃO" : "FINALIZAR PROVA"}
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
            </div>
         </div>
       </div>

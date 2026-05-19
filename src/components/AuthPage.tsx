@@ -1,7 +1,19 @@
 import React, { useState } from "react";
+import bcrypt from "bcryptjs";
 import { User } from "../App";
 import { motion, AnimatePresence } from "motion/react";
 import { Lock, Mail, User as UserIcon, Calendar, ArrowRight, ShieldCheck, Cpu, Key, Eye, EyeOff, Sparkles, X, ChevronRight, Play, Layout, MessageSquare, Terminal, GraduationCap, Target, PenTool, HandMetal, Zap } from "lucide-react";
+
+const BCRYPT_ROUNDS = 10;
+const RECOVERY_TTL_MS = 15 * 60 * 1000;
+const MAX_PROFILE_IMAGE_BYTES = 500 * 1024;
+
+const isHashedPassword = (pw: string) => typeof pw === "string" && pw.startsWith("$2");
+const verifyPassword = (plain: string, stored: string): boolean => {
+  if (!plain || !stored) return false;
+  if (isHashedPassword(stored)) return bcrypt.compareSync(plain, stored);
+  return plain === stored;
+};
 
 interface AuthPageProps {
   onLogin: (user: User) => void;
@@ -62,13 +74,24 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({ ...formData, profileImage: reader.result as string });
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Arquivo inválido. Selecione uma imagem (PNG, JPG, WEBP).");
+      e.target.value = "";
+      return;
     }
+    if (file.size > MAX_PROFILE_IMAGE_BYTES) {
+      setError(`Imagem muito grande. Limite: ${Math.round(MAX_PROFILE_IMAGE_BYTES / 1024)} KB.`);
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      if (typeof result !== "string" || !result.startsWith("data:image/")) return;
+      setFormData({ ...formData, profileImage: result });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,8 +100,11 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
   };
 
   // ── LOCAL STORAGE AUTH (Netlify-compatible, no backend required) ──────────
+  // Senhas guardadas com hash bcrypt. Códigos de recuperação têm TTL de 15 min.
+  // Migração: contas antigas com senha plaintext são re-hashadas no primeiro login OK.
   const DB_KEY = "devgenius_v12_users";
   const CODES_KEY = "devgenius_v12_codes";
+  type RecoveryRecord = { code: string; expiresAt: number };
 
   const getLocalUsers = (): any[] => {
     try { return JSON.parse(localStorage.getItem(DB_KEY) || "[]"); } catch { return []; }
@@ -86,10 +112,21 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
   const saveLocalUsers = (users: any[]) => {
     localStorage.setItem(DB_KEY, JSON.stringify(users));
   };
-  const getLocalCodes = (): Record<string, string> => {
-    try { return JSON.parse(localStorage.getItem(CODES_KEY) || "{}"); } catch { return {}; }
+  const getLocalCodes = (): Record<string, RecoveryRecord> => {
+    try {
+      const raw: Record<string, unknown> = JSON.parse(localStorage.getItem(CODES_KEY) || "{}");
+      const now = Date.now();
+      const out: Record<string, RecoveryRecord> = {};
+      for (const k of Object.keys(raw)) {
+        const v = raw[k];
+        if (v && typeof v === "object" && typeof (v as RecoveryRecord).code === "string" && typeof (v as RecoveryRecord).expiresAt === "number") {
+          if ((v as RecoveryRecord).expiresAt > now) out[k] = v as RecoveryRecord;
+        }
+      }
+      return out;
+    } catch { return {}; }
   };
-  const saveLocalCodes = (codes: Record<string, string>) => {
+  const saveLocalCodes = (codes: Record<string, RecoveryRecord>) => {
     localStorage.setItem(CODES_KEY, JSON.stringify(codes));
   };
 
@@ -101,37 +138,58 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
     try {
       if (mode === "login") {
         const users = getLocalUsers();
-        const user = users.find((u: any) => u.username === formData.username && u.password === formData.password);
-        if (!user) throw new Error("Credenciais inválidas. Verifique seu usuário e senha.");
+        const idx = users.findIndex((u: any) => u.username === formData.username);
+        if (idx === -1 || !verifyPassword(formData.password, users[idx].password)) {
+          throw new Error("Credenciais inválidas. Verifique seu usuário e senha.");
+        }
+        // Migração transparente plaintext → bcrypt no primeiro login OK.
+        if (!isHashedPassword(users[idx].password)) {
+          users[idx].password = bcrypt.hashSync(formData.password, BCRYPT_ROUNDS);
+          saveLocalUsers(users);
+        }
+        const user = users[idx];
         onLogin({ username: user.username, firstName: user.firstName, lastName: user.lastName, profileImage: user.profileImage });
 
       } else if (mode === "register") {
+        if (!formData.firstName || !formData.email || !formData.username || !formData.password) {
+          throw new Error("Preencha todos os campos obrigatórios.");
+        }
+        if (formData.password.length < 8) {
+          throw new Error("A senha deve ter pelo menos 8 caracteres.");
+        }
         const users = getLocalUsers();
         if (users.find((u: any) => u.username === formData.username)) {
           throw new Error("O nome de usuário já está em uso por outro maker.");
         }
-        if (!formData.firstName || !formData.email || !formData.username || !formData.password) {
-          throw new Error("Preencha todos os campos obrigatórios.");
-        }
-        const newUser = { ...formData, id: Date.now().toString(), notes: "" };
+        const passwordHash = bcrypt.hashSync(formData.password, BCRYPT_ROUNDS);
+        const newUser = { ...formData, password: passwordHash, id: Date.now().toString(), notes: "" };
         saveLocalUsers([...users, newUser]);
         onLogin({ username: formData.username, firstName: formData.firstName, lastName: formData.lastName, profileImage: formData.profileImage });
 
       } else if (mode === "forgot") {
         const users = getLocalUsers();
         const user = users.find((u: any) => u.email === formData.recoveryContact || u.username === formData.recoveryContact);
-        if (!user) throw new Error("Nenhum usuário encontrado com esses dados de registro.");
+        // Sem user enumeration: avança o fluxo mesmo se o contato não existe, mas só gera código real se existir.
         const code = Math.floor(10000 + Math.random() * 90000).toString();
-        const codes = getLocalCodes();
-        codes[user.username] = code;
-        saveLocalCodes(codes);
-        setRecoveryUser(user.username);
-        alert(`DEVGENIUS V12 - SEGURANÇA: Código de verificação gerado. (SIMULAÇÃO: seu código é ${code})`);
+        if (user) {
+          const codes = getLocalCodes();
+          codes[user.username] = { code, expiresAt: Date.now() + RECOVERY_TTL_MS };
+          saveLocalCodes(codes);
+          setRecoveryUser(user.username);
+          // Sem SMTP integrado: em dev mostramos no console para facilitar teste.
+          // Em produção (sem backend de email), a UX será "código não recebido" — limitação conhecida.
+          if (import.meta.env.DEV) {
+            console.info(`[devgenius] recovery code for ${user.username}: ${code}`);
+          }
+        } else {
+          setRecoveryUser(null);
+        }
         setMode("verify");
 
       } else if (mode === "verify") {
         const codes = getLocalCodes();
-        if (!recoveryUser || codes[recoveryUser] !== formData.recoveryCode) {
+        const record = recoveryUser ? codes[recoveryUser] : undefined;
+        if (!record || record.code !== formData.recoveryCode || record.expiresAt < Date.now()) {
           throw new Error("Código de verificação inválido ou expirado.");
         }
         setMode("reset");
@@ -140,16 +198,21 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
         if (!formData.newPassword || formData.newPassword.length < 8) {
           throw new Error("Nova senha deve ter pelo menos 8 caracteres.");
         }
+        if (!recoveryUser) throw new Error("Sessão de recuperação inválida. Reinicie o processo.");
+        const codes = getLocalCodes();
+        const record = codes[recoveryUser];
+        if (!record || record.expiresAt < Date.now()) {
+          throw new Error("Código de recuperação expirado. Solicite um novo.");
+        }
         const users = getLocalUsers();
         const idx = users.findIndex((u: any) => u.username === recoveryUser);
         if (idx === -1) throw new Error("Falha crítica: Usuário não localizado.");
-        users[idx].password = formData.newPassword;
+        users[idx].password = bcrypt.hashSync(formData.newPassword, BCRYPT_ROUNDS);
         saveLocalUsers(users);
-        const codes = getLocalCodes();
-        delete codes[recoveryUser!];
+        delete codes[recoveryUser];
         saveLocalCodes(codes);
-        alert("✅ Sua chave de acesso DevGenius V12 foi atualizada com sucesso. Proceda para o login.");
         setMode("login");
+        setError(null);
       }
     } catch (err: any) {
       setError(err.message);
@@ -292,6 +355,7 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                           <input
                             required
                             name="firstName"
+                            autoComplete="given-name"
                             value={formData.firstName}
                             onChange={handleChange}
                             placeholder="Ex: João"
@@ -302,6 +366,7 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                           <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-500 ml-1">Sobrenome</label>
                           <input
                             name="lastName"
+                            autoComplete="family-name"
                             value={formData.lastName}
                             onChange={handleChange}
                             placeholder="Opcional"
@@ -337,6 +402,7 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                             required
                             type="email"
                             name="email"
+                            autoComplete="email"
                             value={formData.email}
                             onChange={handleChange}
                             placeholder="seu@email.com"
@@ -353,6 +419,7 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                             required
                             type="date"
                             name="birthDate"
+                            autoComplete="bday"
                             value={formData.birthDate}
                             onChange={handleChange}
                             className="w-full bg-neutral-950 border border-white/5 rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-cyan-500/50 transition-colors"
@@ -371,6 +438,7 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                           <input
                             required
                             name="username"
+                            autoComplete="username"
                             value={formData.username}
                             onChange={handleChange}
                             placeholder="username_tech"
@@ -387,6 +455,7 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                             required
                             type={showPassword ? "text" : "password"}
                             name="password"
+                            autoComplete={mode === "login" ? "current-password" : "new-password"}
                             value={formData.password}
                             onChange={handleChange}
                             placeholder="••••••••"
@@ -462,6 +531,7 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                             required
                             type="password"
                             name="newPassword"
+                            autoComplete="new-password"
                             value={formData.newPassword}
                             onChange={handleChange}
                             placeholder="Mínimo 8 caracteres"

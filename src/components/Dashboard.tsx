@@ -1,10 +1,39 @@
 import React, { useState, useRef, useEffect } from "react";
+import bcrypt from "bcryptjs";
 import { User } from "../App";
 import { DATA_PLACAS, DATA_COMPONENTES, DATA_PC_HARDWARE, HardwareItem } from "../data/hardware";
 import { PROJECTS, Project } from "../data/projects";
 import { QUESTIONS, Question, Subject, Level } from "../data/questions";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
+
+const BCRYPT_ROUNDS = 10;
+const MAX_PROFILE_IMAGE_BYTES = 500 * 1024;
+
+const isHashedPassword = (pw: string) => typeof pw === "string" && pw.startsWith("$2");
+const verifyPassword = (plain: string, stored: string): boolean => {
+  if (!plain || !stored) return false;
+  if (isHashedPassword(stored)) return bcrypt.compareSync(plain, stored);
+  return plain === stored;
+};
+
+// Whitelist de fonte para <img>: apenas https remoto ou data: image/* base64.
+// Bloqueia javascript:, file://, blob: e qualquer outro vetor.
+const safeImageSrc = (src: string | undefined | null): string | undefined => {
+  if (!src) return undefined;
+  if (src.startsWith("https://") || src.startsWith("data:image/") || src.startsWith("/")) return src;
+  return undefined;
+};
+
+// Helpers de localStorage para o "DB" mock — usados tanto pelo Dashboard quanto pelos subcomponentes.
+const DB_KEY = "devgenius_v12_users";
+const getLocalUsers = (): any[] => {
+  try { return JSON.parse(localStorage.getItem(DB_KEY) || "[]"); } catch { return []; }
+};
+const saveLocalUsers = (users: any[]) => {
+  localStorage.setItem(DB_KEY, JSON.stringify(users));
+};
 import { 
   LogOut, Cpu, Box, Layout, MessageSquare, Code, Terminal, 
   Search, Plus, Layers, Info, CheckCircle2, ChevronRight, Send, HelpCircle,
@@ -88,15 +117,6 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
     };
     return saved ? JSON.parse(saved) : defaultProgress;
   });
-
-  // ── LOCAL STORAGE HELPERS (Netlify-compatible) ───────────────────────────
-  const DB_KEY = "devgenius_v12_users";
-  const getLocalUsers = (): any[] => {
-    try { return JSON.parse(localStorage.getItem(DB_KEY) || "[]"); } catch { return []; }
-  };
-  const saveLocalUsers = (users: any[]) => {
-    localStorage.setItem(DB_KEY, JSON.stringify(users));
-  };
 
   useEffect(() => {
     setSubTab("todos");
@@ -212,7 +232,7 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
         response = data.response;
       } catch {
         // Local fallback when no API key configured
-        response = `# 🛠️ PROJETO: ${selectedPlaca.nome} NEXUS\n\n## 📝 SUMÁRIO EXECUTIVO\nSistema modular utilizando **${selectedPlaca.nome}** como unidade central de processamento com ${basket.map(b => b.nome).join(", ")}.\n\n## 📦 LISTA DE MATERIAIS\n- 1x ${selectedPlaca.nome}\n${basket.map(b => `- 1x ${b.nome}`).join("\n")}\n\n## 🔌 GUIA DE CONEXÕES\n${basket.map(b => `- **${b.nome}** → conecte nos pinos digitais/analógicos conforme datasheet`).join("\n")}\n\n## 💻 CÓDIGO BASE\n\`\`\`cpp\nvoid setup() {\n  Serial.begin(9600);\n  // Inicialize seus periféricos aqui\n}\n\nvoid loop() {\n  // Sua lógica principal\n  delay(100);\n}\n\`\`\`\n\n## ⚠️ NOTA\nPara gerar esquemáticos completos com IA, configure a variável GEMINI_API_KEY no arquivo public_html/api/.env da Hostinger.`;
+        response = `# 🛠️ PROJETO: ${selectedPlaca.nome} NEXUS\n\n## 📝 SUMÁRIO EXECUTIVO\nSistema modular utilizando **${selectedPlaca.nome}** como unidade central de processamento com ${basket.map(b => b.nome).join(", ")}.\n\n## 📦 LISTA DE MATERIAIS\n- 1x ${selectedPlaca.nome}\n${basket.map(b => `- 1x ${b.nome}`).join("\n")}\n\n## 🔌 GUIA DE CONEXÕES\n${basket.map(b => `- **${b.nome}** → conecte nos pinos digitais/analógicos conforme datasheet`).join("\n")}\n\n## 💻 CÓDIGO BASE\n\`\`\`cpp\nvoid setup() {\n  Serial.begin(9600);\n  // Inicialize seus periféricos aqui\n}\n\nvoid loop() {\n  // Sua lógica principal\n  delay(100);\n}\n\`\`\`\n\n## ⚠️ NOTA\nO servidor de IA do DevGenius está temporariamente indisponível. Esta é uma versão simplificada — tente novamente em instantes para gerar o esquemático completo.`;
       }
       setAiResult(response);
     } catch (err: any) {
@@ -332,7 +352,7 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
             <>
               <div className={`${viewMode === "compact" ? "p-2 justify-center" : "bg-white/5 rounded-3xl p-5"} flex items-center gap-4 mb-4 backdrop-blur-xl group cursor-pointer`} onClick={() => handleTabChange("configuracoes")}>
                 <div className={`${viewMode === "compact" ? "w-10 h-10" : "w-12 h-12"} bg-neutral-950 border border-white/10 rounded-2xl flex items-center justify-center text-cyan-400 font-black text-xl shadow-inner overflow-hidden shrink-0`}>
-                  {profile.photo ? <img src={profile.photo} className="w-full h-full object-cover" /> : user.username[0].toUpperCase()}
+                  {safeImageSrc(profile.photo) ? <img src={safeImageSrc(profile.photo)} alt="Foto de perfil" className="w-full h-full object-cover" /> : user.username[0].toUpperCase()}
                 </div>
                 {viewMode === "expanded" && (
                   <div className="flex-1 overflow-hidden">
@@ -810,8 +830,12 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
       const users = getLocalUsers();
       const idx = users.findIndex((u: any) => u.username === user.username);
       if (idx === -1) throw new Error("Usuário não encontrado.");
-      if (users[idx].email !== emailUpdate.current || users[idx].password !== emailUpdate.pass) {
+      if (users[idx].email !== emailUpdate.current || !verifyPassword(emailUpdate.pass, users[idx].password)) {
         throw new Error("E-mail ou senha atuais incorretos.");
+      }
+      // Migração transparente da senha enquanto temos a plaintext em mãos.
+      if (!isHashedPassword(users[idx].password)) {
+        users[idx].password = bcrypt.hashSync(emailUpdate.pass, BCRYPT_ROUNDS);
       }
       users[idx].email = emailUpdate.nuovo;
       saveLocalUsers(users);
@@ -830,9 +854,11 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
     try {
       const users = getLocalUsers();
       const idx = users.findIndex((u: any) =>
-        u.username === user.username && u.email === deleteAccount.email && u.password === deleteAccount.pass
+        u.username === user.username && u.email === deleteAccount.email
       );
-      if (idx === -1) throw new Error("A validação falhou. Verifique os dados de exclusão.");
+      if (idx === -1 || !verifyPassword(deleteAccount.pass, users[idx].password)) {
+        throw new Error("A validação falhou. Verifique os dados de exclusão.");
+      }
       users.splice(idx, 1);
       saveLocalUsers(users);
       showToast("Conta excluída permanentemente. Sentiremos sua falta no DevGenius.");
@@ -844,14 +870,25 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setTempPhoto(reader.result as string);
-        showToast("Imagem carregada localmente.");
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("Arquivo inválido. Selecione uma imagem.", "warn");
+      e.target.value = "";
+      return;
     }
+    if (file.size > MAX_PROFILE_IMAGE_BYTES) {
+      showToast(`Imagem muito grande. Limite: ${Math.round(MAX_PROFILE_IMAGE_BYTES / 1024)} KB.`, "warn");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      if (typeof result !== "string" || !result.startsWith("data:image/")) return;
+      setTempPhoto(result);
+      showToast("Imagem carregada localmente.");
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleChangePass = async () => {
@@ -867,12 +904,14 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
       showToast("Nova senha muito curta.", "warn");
       return;
     }
-    
+
     try {
       const users = getLocalUsers();
-      const idx = users.findIndex((u: any) => u.username === user.username && u.password === currentPass);
-      if (idx === -1) throw new Error("Senha atual incorreta.");
-      users[idx].password = newPass;
+      const idx = users.findIndex((u: any) => u.username === user.username);
+      if (idx === -1 || !verifyPassword(currentPass, users[idx].password)) {
+        throw new Error("Senha atual incorreta.");
+      }
+      users[idx].password = bcrypt.hashSync(newPass, BCRYPT_ROUNDS);
       saveLocalUsers(users);
       showToast("Senha alterada com sucesso!");
       setCurrentPass("");
@@ -888,7 +927,7 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
       <div className="lg:col-span-4 space-y-8">
         <div className="p-12 bg-neutral-900/40 rounded-[4rem] border border-white/5 flex flex-col items-center text-center shadow-2xl relative overflow-hidden">
           <div className="w-32 h-32 bg-neutral-950 border-2 border-cyan-500/30 rounded-[2.5rem] flex items-center justify-center mb-6 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.2)]">
-            {tempPhoto ? <img src={tempPhoto} className="w-full h-full object-cover" /> : <UserCircle className="w-16 h-16 text-neutral-700" />}
+            {safeImageSrc(tempPhoto) ? <img src={safeImageSrc(tempPhoto)} alt="Foto de perfil" className="w-full h-full object-cover" /> : <UserCircle className="w-16 h-16 text-neutral-700" />}
           </div>
           <h3 className="text-2xl font-black text-white">{user.firstName} {user.lastName}</h3>
           <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-2">{profile.status} // Beta Tester</p>
@@ -1290,7 +1329,7 @@ function WorkspaceView({ placa, components, onRemoveComp, onClearPlaca, onCompil
             </div>
             
             <div className="prose prose-invert max-w-none prose-h1:text-5xl prose-h1:font-black prose-h1:tracking-tighter prose-h1:uppercase prose-h1:text-cyan-400 prose-h2:text-3xl prose-h2:font-black prose-h2:uppercase prose-h2:tracking-tight prose-h2:text-white prose-p:text-neutral-400 prose-p:text-lg prose-p:leading-relaxed prose-pre:bg-neutral-950 prose-pre:border prose-pre:border-white/5 prose-pre:rounded-3xl prose-li:text-neutral-300 prose-strong:text-white">
-               <ReactMarkdown>{result}</ReactMarkdown>
+               <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{result}</ReactMarkdown>
             </div>
 
             <div className="mt-20 pt-12 border-t border-white/5 flex items-center justify-between">
@@ -1371,9 +1410,9 @@ function IAPanel() {
         aiResponse = data.response;
       } catch {
         if (foundFallback) {
-          aiResponse = foundFallback + "\n\n*(Resposta local — configure GEMINI_API_KEY no arquivo public_html/api/.env da Hostinger para IA completa)*";
+          aiResponse = foundFallback + "\n\n*(Resposta local — IA temporariamente indisponível)*";
         } else {
-          aiResponse = `Olá! Sou o DevGenius IA. Você perguntou sobre "${userMsg}".\n\nPara respostas completas com IA, configure a variável **GEMINI_API_KEY** no arquivo \`public_html/api/.env\` da sua Hostinger. Por enquanto, consulte a aba **FAQ Engenharia** para informações técnicas detalhadas sobre hardware.`;
+          aiResponse = `Olá! Sou o DevGenius IA. Você perguntou sobre "${userMsg}".\n\nA IA completa está temporariamente indisponível. Por enquanto, consulte a aba **FAQ Engenharia** para informações técnicas detalhadas sobre hardware, ou tente novamente em instantes.`;
         }
       }
       setMessages(prev => [...prev, { role: "ia", content: aiResponse }]);
@@ -1427,7 +1466,7 @@ function IAPanel() {
               m.role === "user" ? "bg-cyan-500 text-neutral-950 font-bold" : "bg-neutral-800/50 border border-white/5 text-neutral-300"
             }`}>
               <div className="prose prose-invert prose-sm max-w-none">
-                <ReactMarkdown>{m.content}</ReactMarkdown>
+                <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{m.content}</ReactMarkdown>
               </div>
             </div>
           </motion.div>

@@ -4,6 +4,7 @@ import { User } from "../App";
 import { DATA_PLACAS, DATA_COMPONENTES, DATA_PC_HARDWARE, HardwareItem } from "../data/hardware";
 import { PROJECTS, Project } from "../data/projects";
 import { QUESTIONS, TRILHA_INFO, Question, Trilha } from "../data/questions";
+import { buscarResposta } from "../data/iaKnowledge";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
@@ -1360,10 +1361,13 @@ function IAPanel() {
 
   const readyResponses = [
     "Como ligar um LED no Arduino?",
-    "Explique o protocolo I2C.",
-    "Melhor microcontrolador para IoT?",
-    "Como reduzir ruído em sensores?",
-    "Código básico para ESP32."
+    "Como conectar ESP32 ao WiFi?",
+    "O que é o protocolo I2C?",
+    "Como usar sensor DHT22?",
+    "Como usar sensor ultrassônico?",
+    "O que é MQTT?",
+    "Como usar deep sleep ESP32?",
+    "Como calcular resistor para LED?",
   ];
 
   useEffect(() => {
@@ -1375,38 +1379,24 @@ function IAPanel() {
   const onSend = async (customMsg?: string) => {
     const userMsg = customMsg || input.trim();
     if (!userMsg || loading) return;
-    
+
     setInput("");
     setMessages(prev => [...prev, { role: "user", content: userMsg }]);
     setLoading(true);
 
     try {
-      // Fallback pre-definido para quando o servidor falha ou offline
-      const fallbackResponses: Record<string, string> = {
-        "como ligar um led": "Para ligar um LED no DEVGENIUS: 1. Conecte o anodo (perna longa) a um pino digital (ex: D13) com um resistor de 220 ohms. 2. Conecte o catodo ao GND. 3. Use digitalWrite(13, HIGH) no código.",
-        "o que é o devgenius": "DEVGENIUS é uma plataforma de estudo e prototipagem em hardware embarcado: catálogo de componentes, projetos guiados, assistente IA e trilhas de certificação. Tudo em português.",
-        "como usar sensor ultrassônico": "Conecte o VCC ao 5V, GND ao GND, Trig ao pino D9 e Echo ao pino D10. No código, envie um pulso de 10us no Trig e meça o tempo de retorno no Echo usando pulseIn().",
-        "arduino vs esp32": "O Arduino Uno é excelente para iniciantes e projetos de 5V estáveis. O ESP32 oferece WiFi, Bluetooth, mais memória e clock de 240MHz, ideal para IoT e IA de borda.",
-        "devcore": "O ecossistema DevGenius é uma plataforma de hardware e software integrada para engenharia de precisão, focada em automação, robótica e IA.",
-        "devgenius": "O ecossistema DevGenius é uma plataforma de hardware e software integrada para engenharia de precisão, focada em automação, robótica e IA.",
-        "como programar": "Você pode programar no DevGenius usando C++ (para firmware de baixo nível) ou JavaScript (para dashboards e lógica de nuvem). Visite a aba 'Base de Código' para exemplos.",
-        "configurar wifi": "Para configurar WiFi no ESP32: 1. Use a biblioteca WiFi.h. 2. Chame WiFi.begin(ssid, password). 3. Verifique o status com WiFi.status() == WL_CONNECTED.",
-        "quais as placas": "Temos diversas placas: ATmega328P (Uno), ESP32-WROOM (IoT), STM32 (Performance), Raspberry Pi (SBC) e Blue Pill (Compacta).",
-        "componentes disponíveis": "Dispomos de sensores (DHT22, MPU6050, PIR), atuadores (Servo, Relé, Buzzer) e displays (OLED, LCD, Matriz LED).",
-        "o que é um relé": "Um relé é um interruptor eletromecânico que permite controlar uma carga de alta potência (como uma lâmpada 220V) usando um sinal de baixa potência (5V) do microcontrolador.",
-        "ajuda": "Eu sou a DevGenius IA. Posso te ajudar com esquemáticos, códigos C++/JS e dúvidas de hardware. Tente perguntar sobre 'como ligar um componente', 'detalhes do DEVGENIUS' ou 'lista de placas'."
-      };
+      // ── 1. Verificar base de conhecimento embutida (150 Q&A) ─────────────
+      // O matching usa similaridade de palavras-chave sem depender de nenhuma API.
+      const respostaLocal = buscarResposta(userMsg);
 
-      const lowerInput = userMsg.toLowerCase();
-      let foundFallback = "";
-      for (const key in fallbackResponses) {
-        if (lowerInput.includes(key)) {
-          foundFallback = fallbackResponses[key];
-          break;
-        }
+      if (respostaLocal) {
+        // Resposta encontrada localmente — sem latência, sem custo de API
+        await new Promise(r => setTimeout(r, 400)); // pequena pausa para UX natural
+        setMessages(prev => [...prev, { role: "ia", content: respostaLocal }]);
+        return;
       }
 
-      // Try backend API (PHP on Hostinger / Node on VPS), fallback to local responses
+      // ── 2. Nenhuma correspondência local → tenta a API do servidor ────────
       let aiResponse = "";
       try {
         const res = await fetch("/api/ai-chat", {
@@ -1418,12 +1408,10 @@ function IAPanel() {
         if (!res.ok) throw new Error(data.error);
         aiResponse = data.response;
       } catch {
-        if (foundFallback) {
-          aiResponse = foundFallback + "\n\n*(Resposta local — IA temporariamente indisponível)*";
-        } else {
-          aiResponse = `Olá! Sou o DevGenius IA. Você perguntou sobre "${userMsg}".\n\nA IA completa está temporariamente indisponível. Por enquanto, consulte a aba **FAQ Engenharia** para informações técnicas detalhadas sobre hardware, ou tente novamente em instantes.`;
-        }
+        // ── 3. API indisponível → mensagem genérica de sugestão ──────────
+        aiResponse = `Olá! Sou o **DevGenius IA** e ainda não encontrei uma resposta pronta para:\n\n> "${userMsg}"\n\nSugestões:\n- Reformule a pergunta com palavras-chave técnicas (ex: "como usar DHT22", "protocolo I2C")\n- Consulte a aba **FAQ Engenharia** para referências técnicas\n- Veja os **Projetos Prontos** para exemplos práticos\n- Acesse a **Base de Código** para C++ e JavaScript embarcado\n\nTenho 150 respostas prontas sobre Arduino, ESP32, sensores, protocolos, eletrônica e muito mais!`;
       }
+
       setMessages(prev => [...prev, { role: "ia", content: aiResponse }]);
     } catch (err: any) {
       setMessages(prev => [...prev, { role: "ia", content: `⚠️ ${err.message || "Erro de conexão neural. Verifique o servidor."}` }]);
@@ -1440,7 +1428,7 @@ function IAPanel() {
         </div>
         <div>
           <h3 className="text-xl font-black tracking-tight text-white uppercase">ASSISTENTE DEVGENIUS IA</h3>
-          <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Conexão estável // Gemini ativo</p>
+          <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">150 respostas embutidas // Gemini como fallback</p>
         </div>
       </div>
 
@@ -1508,7 +1496,7 @@ function IAPanel() {
             <Send className="w-5 h-5" />
           </button>
         </div>
-        <p className="text-center text-[9px] text-neutral-700 font-bold uppercase tracking-widest mt-6">ALIMENTADO POR GEMINI 1.5 PRO // NÚCLEO V12 LEGACY</p>
+        <p className="text-center text-[9px] text-neutral-700 font-bold uppercase tracking-widest mt-6">150 Q&A EMBUTIDAS // MATCHING POR PALAVRAS-CHAVE // GEMINI COMO BACKUP</p>
       </div>
     </div>
   );

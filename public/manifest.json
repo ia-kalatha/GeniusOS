@@ -1,0 +1,45 @@
+{
+  "name": "DevGenius — Plataforma de Hardware",
+  "short_name": "DevGenius",
+  "description": "Hub completo de hardware, eletrônica, projetos e IA para makers e engenheiros.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#0a0a0a",
+  "theme_color": "#06b6d4",
+  "orientation": "any",
+  "lang": "pt-BR",
+  "categories": ["education", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Controladoras",
+      "short_name": "Placas",
+      "description": "Ver catálogo de placas",
+      "url": "/?tab=placas",
+      "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "DevGenius IA",
+      "short_name": "IA",
+      "description": "Conversar com a IA",
+      "url": "/?tab=ia",
+      "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+    }
+  ]
+}

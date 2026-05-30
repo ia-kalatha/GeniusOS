@@ -2,28 +2,50 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     <meta name="theme-color" content="#06b6d4" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DevGenius" />
+    <meta name="msapplication-TileColor" content="#0a0a0a" />
+    <meta name="msapplication-TileImage" content="/logo.png" />
+    <meta name="application-name" content="DevGenius" />
 
     <title>DEVGENIUS — Plataforma de Engenharia de Hardware e Software</title>
-    <meta name="description" content="Hub completo de hardware e software para makers: placas, componentes, projetos e IA Gemini integrada." />
+    <meta name="description" content="Hub completo de hardware e software para makers: placas, componentes, projetos e IA integrada." />
+    <meta name="keywords" content="arduino, esp32, eletrônica, hardware, maker, IoT, firmware, programação" />
+    <meta name="author" content="DevGenius" />
 
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Favicon & Touch Icons -->
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/logo.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/logo.png" />
 
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="DEVGENIUS — Plataforma de Engenharia de Hardware e Software" />
-    <meta property="og:description" content="Hub completo de hardware e software para makers: placas, componentes, projetos e IA Gemini integrada." />
+    <meta property="og:description" content="Hub completo de hardware e software para makers: placas, componentes, projetos e IA integrada." />
     <meta property="og:image" content="/logo.png" />
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:site_name" content="DEVGENIUS" />
 
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="DEVGENIUS — Plataforma de Engenharia de Hardware e Software" />
-    <meta name="twitter:description" content="Hub completo de hardware e software para makers: placas, componentes, projetos e IA Gemini integrada." />
+    <meta name="twitter:description" content="Hub completo de hardware e software para makers: placas, componentes, projetos e IA integrada." />
     <meta name="twitter:image" content="/logo.png" />
+
+    <!-- Preconnect para performance -->
+    <link rel="preconnect" href="https://images.unsplash.com" />
+    <link rel="dns-prefetch" href="https://images.unsplash.com" />
   </head>
-  <body>
+  <body class="overscroll-none">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

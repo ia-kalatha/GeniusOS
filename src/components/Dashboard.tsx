@@ -3,8 +3,9 @@ import bcrypt from "bcryptjs";
 import { User } from "../App";
 import { DATA_PLACAS, DATA_COMPONENTES, DATA_PC_HARDWARE, HardwareItem } from "../data/hardware";
 import { PROJECTS, Project } from "../data/projects";
-import { QUESTIONS, TRILHA_INFO, Question, Trilha } from "../data/questions";
-import { buscarResposta } from "../data/iaKnowledge";
+import { QUESTIONS, TRILHA_INFO, MODULO_INFO, Question, Trilha, Modulo } from "../data/questions";
+import { buscarResposta, IA_GUIDED_CATEGORIES, GuidedCategory } from "../data/iaKnowledge";
+import { getProjectsForComponent, ComponentProject } from "../data/componentProjects";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
@@ -35,13 +36,14 @@ const getLocalUsers = (): any[] => {
 const saveLocalUsers = (users: any[]) => {
   localStorage.setItem(DB_KEY, JSON.stringify(users));
 };
-import { 
-  LogOut, Cpu, Box, Layout, MessageSquare, Code, Terminal, 
+import {
+  LogOut, Cpu, Box, Layout, MessageSquare, Code, Terminal,
   Search, Plus, Layers, Info, CheckCircle2, ChevronRight, Send, HelpCircle,
-  Loader2, AlertCircle, Sparkles, X, Filter, GraduationCap, ClipboardCheck, 
+  Loader2, AlertCircle, Sparkles, X, Filter, GraduationCap, ClipboardCheck,
   Trophy, Lock, Zap, Activity, Gauge, Battery, Play, History, BookOpen,
   Settings, Monitor, UserCircle, Moon, Sun, Type, Image as ImageIcon, Github, Eye, EyeOff,
-  Book, StickyNote, Trash2, Edit3, Save, Fuel, ShieldAlert, Smartphone
+  Book, StickyNote, Trash2, Edit3, Save, Fuel, ShieldAlert, Smartphone,
+  BookMarked, BarChart2, FolderOpen, ChevronDown, BadgeCheck, Menu, Home
 } from "lucide-react";
 
 interface DashboardProps {
@@ -66,10 +68,33 @@ interface TrilhaProgress {
 type TestProgress = Record<Trilha, TrilhaProgress>;
 
 const DEFAULT_TEST_PROGRESS: TestProgress = {
-  eletronica: { best: null, completed: false },
-  arduino: { best: null, completed: false },
-  sensores: { best: null, completed: false },
+  eletronica:    { best: null, completed: false },
+  arduino:       { best: null, completed: false },
+  sensores:      { best: null, completed: false },
+  eletro_inter:  { best: null, completed: false },
+  arduino_inter: { best: null, completed: false },
+  redes_inter:   { best: null, completed: false },
+  eletro_pro:    { best: null, completed: false },
+  firmware_pro:  { best: null, completed: false },
+  iot_pro:       { best: null, completed: false },
 };
+
+// ─── Sistema de Coleção / Índice ─────────────────────────────────────────
+interface ItemCollection {
+  marked: boolean;
+  markedAt: string | null;
+  completedProjects: number[]; // índices 0-9 dos projetos concluídos
+}
+type CollectionState = Record<string, ItemCollection>;
+
+const COLLECTION_KEY = "devgenius_collection_v1";
+const loadCollection = (): CollectionState => {
+  try { return JSON.parse(localStorage.getItem(COLLECTION_KEY) || "{}"); } catch { return {}; }
+};
+const saveCollection = (c: CollectionState) => {
+  localStorage.setItem(COLLECTION_KEY, JSON.stringify(c));
+};
+const defaultEntry = (): ItemCollection => ({ marked: false, markedAt: null, completedProjects: [] });
 
 const THEMES = {
   kernel: { bg: "neutral-950", accent: "cyan-400", font: "font-sans" },
@@ -80,6 +105,7 @@ const THEMES = {
 export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>("placas");
   const [viewMode, setViewMode] = useState<"compact" | "expanded">("expanded");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const restrictedTabs: Tab[] = ["workspace", "ia", "notas", "provas", "configuracoes"];
 
@@ -90,6 +116,7 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
       return;
     }
     setActiveTab(tab);
+    setSidebarOpen(false); // fecha sidebar no mobile ao navegar
   };
   const [subTab, setSubTab] = useState<string>("todos");
   const [search, setSearch] = useState("");
@@ -99,6 +126,7 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
   const [modalItem, setModalItem] = useState<HardwareItem | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "warn" } | null>(null);
   const [notes, setNotes] = useState<string>("");
+  const [collection, setCollection] = useState<CollectionState>(loadCollection);
   const [lastNoteSync, setLastNoteSync] = useState<string | null>(null);
 
   // Settings State
@@ -134,6 +162,32 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
       if (saved) setNotes(saved);
     } catch (e) { console.error("Erro ao carregar notas."); }
   }, [activeTab, user?.username]);
+
+  // ─── Funções de coleção ────────────────────────────────────────────────
+  const toggleMark = (itemId: string) => {
+    const prev = collection[itemId] ?? defaultEntry();
+    const next: ItemCollection = {
+      ...prev,
+      marked: !prev.marked,
+      markedAt: !prev.marked ? new Date().toISOString() : null,
+    };
+    const updated = { ...collection, [itemId]: next };
+    setCollection(updated);
+    saveCollection(updated);
+    showToast(next.marked ? "Adicionado à coleção ⭐" : "Removido da coleção");
+  };
+
+  const toggleProject = (itemId: string, projIdx: number) => {
+    const prev = collection[itemId] ?? defaultEntry();
+    const done = prev.completedProjects.includes(projIdx)
+      ? prev.completedProjects.filter(i => i !== projIdx)
+      : [...prev.completedProjects, projIdx];
+    const updated = { ...collection, [itemId]: { ...prev, completedProjects: done } };
+    setCollection(updated);
+    saveCollection(updated);
+  };
+
+  const getEntry = (itemId: string) => collection[itemId] ?? defaultEntry();
 
   const syncNotes = async (content: string) => {
     if (!user) return;
@@ -253,7 +307,7 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
   };
 
   return (
-    <div className={`flex h-screen bg-${theme.bg} overflow-hidden ${theme.font} transition-colors duration-500 ${viewMode === "compact" ? "text-xs" : ""}`}>
+    <div className={`flex h-screen h-[100dvh] bg-${theme.bg} overflow-hidden ${theme.font} transition-colors duration-500 ${viewMode === "compact" ? "text-xs" : ""}`}>
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
@@ -262,12 +316,25 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
         .scrollbar-visible::-webkit-scrollbar { width: 10px; display: block !important; }
         .scrollbar-visible::-webkit-scrollbar-thumb { background: rgba(6,182,212,0.5); border-radius: 10px; border: 2px solid rgba(0,0,0,0.3); }
         .scrollbar-visible::-webkit-scrollbar-thumb:hover { background: rgba(6,182,212,0.8); }
-        /* Main Viewport Scrollbar */
         .viewport-scroll::-webkit-scrollbar { width: 6px; }
         .viewport-scroll::-webkit-scrollbar-track { background: transparent; }
         .viewport-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 10px; }
         .viewport-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.1); }
+        @media (max-width: 767px) {
+          .scrollbar-visible::-webkit-scrollbar { width: 4px; }
+        }
       `}</style>
+
+      {/* ── Mobile Sidebar Backdrop ── */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 z-[55] md:hidden backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
       
       <AnimatePresence>
         {showTimeline && (
@@ -277,7 +344,7 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
           >
              <div className="max-w-4xl w-full space-y-12">
                 <div className="text-center space-y-4">
-                  <h2 className="text-6xl font-black tracking-tighter uppercase">LINHA DO TEMPO <span className="text-cyan-400">DEVGENIUS</span></h2>
+                  <h2 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tighter uppercase">LINHA DO TEMPO <span className="text-cyan-400">DEVGENIUS</span></h2>
                   <p className="text-neutral-500 font-medium">A evolução dos microcontroladores e a revolução da engenharia de precisão.</p>
                 </div>
 
@@ -329,15 +396,27 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
-      <aside className={`border-r border-white/5 bg-neutral-900/40 flex flex-col z-50 transition-all duration-500 ${viewMode === "compact" ? "w-20" : "w-72"}`}>
-        <div className={`${viewMode === "compact" ? "p-4" : "p-8"}`}>
-          <h1 className={`font-black tracking-tighter flex items-center gap-3 ${viewMode === "compact" ? "justify-center" : ""}`}>
+      {/* Sidebar — overlay no mobile, lateral no desktop */}
+      <aside className={`
+        fixed md:relative inset-y-0 left-0 z-[60]
+        border-r border-white/5 bg-neutral-900/95 md:bg-neutral-900/40
+        flex flex-col transition-all duration-300 ease-in-out
+        ${viewMode === "compact" ? "w-20" : "w-72"}
+        ${sidebarOpen ? "translate-x-0 shadow-2xl shadow-black/50" : "-translate-x-full md:translate-x-0"}
+      `}>
+        <div className={`${viewMode === "compact" ? "p-4" : "p-6 md:p-8"} flex items-center justify-between`}>
+          <h1 className={`font-black tracking-tighter flex items-center gap-3 ${viewMode === "compact" ? "justify-center w-full" : ""}`}>
             <div className="w-10 h-10 bg-neutral-950 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
               <img src="/logo.png" className="w-full h-full object-cover opacity-80" />
             </div>
-            {viewMode === "expanded" && <span>DEVGENIUS <span className="text-cyan-400">V12</span></span>}
+            {viewMode === "expanded" && <span className="text-lg">DEVGENIUS <span className="text-cyan-400">V12</span></span>}
           </h1>
+          {/* Fechar sidebar no mobile */}
+          {viewMode === "expanded" && (
+            <button onClick={() => setSidebarOpen(false)} className="md:hidden w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-colors shrink-0">
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         <nav className={`flex-1 ${viewMode === "compact" ? "px-2" : "px-4"} space-y-2 overflow-y-auto scrollbar-visible min-h-0`}>
@@ -400,72 +479,76 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
 
       {/* Main Container */}
       <main className="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#0e749008_0%,transparent_50%)]">
-        {/* Header */}
-        <header className="px-10 py-6 flex items-center justify-between border-b border-white/5 bg-neutral-950/40 backdrop-blur-2xl z-40 shrink-0">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-               <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_10px_#06b6d4]" />
-               <h2 className="text-3xl font-black tracking-tighter uppercase">{activeTab}</h2>
+        {/* Header — Responsivo */}
+        <header className="px-4 md:px-10 py-3 md:py-6 flex items-center justify-between border-b border-white/5 bg-neutral-950/40 backdrop-blur-2xl z-40 shrink-0 gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Hamburger — mobile only */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-colors shrink-0"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_10px_#06b6d4] shrink-0 hidden sm:block" />
+                <h2 className="text-lg sm:text-2xl md:text-3xl font-black tracking-tighter uppercase truncate">{activeTab}</h2>
+              </div>
+              <p className="text-neutral-500 text-[9px] font-bold uppercase tracking-widest hidden sm:block pl-4">Sistema v12.4.0 // Núcleo Ativo</p>
             </div>
-            <p className="text-neutral-500 text-[10px] font-bold uppercase tracking-widest pl-5">Sistema v12.4.0 // Núcleo Ativo</p>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="flex bg-neutral-900 border border-white/5 rounded-2xl p-1 shrink-0 overflow-hidden">
-               <button 
-                 onClick={() => setViewMode("expanded")}
-                 className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${viewMode === "expanded" ? "bg-cyan-500 text-neutral-950 shadow-lg" : "text-neutral-500 hover:text-white"}`}
-               >
-                 AMPLIADO
-               </button>
-               <button 
-                 onClick={() => setViewMode("compact")}
-                 className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${viewMode === "compact" ? "bg-cyan-500 text-neutral-950 shadow-lg" : "text-neutral-500 hover:text-white"}`}
-               >
-                 COMPACTO
-               </button>
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {/* Modo expandido/compacto — hidden no mobile */}
+            <div className="hidden md:flex bg-neutral-900 border border-white/5 rounded-2xl p-1 overflow-hidden">
+              <button
+                onClick={() => setViewMode("expanded")}
+                className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${viewMode === "expanded" ? "bg-cyan-500 text-neutral-950 shadow-lg" : "text-neutral-500 hover:text-white"}`}
+              >AMPLIADO</button>
+              <button
+                onClick={() => setViewMode("compact")}
+                className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${viewMode === "compact" ? "bg-cyan-500 text-neutral-950 shadow-lg" : "text-neutral-500 hover:text-white"}`}
+              >COMPACTO</button>
             </div>
+
+            {/* Login — compacto no mobile */}
             {!user && (
-              <button 
+              <button
                 onClick={onAuthRequired}
-                className="group flex items-center gap-4 bg-cyan-500 text-neutral-950 pl-4 pr-1.5 py-1.5 rounded-xl font-black text-[10px] tracking-widest shadow-lg shadow-cyan-500/10 hover:scale-105 active:scale-95 transition-all"
+                className="flex items-center gap-2 bg-cyan-500 text-neutral-950 px-3 md:pl-4 md:pr-1.5 py-2 md:py-1.5 rounded-xl font-black text-[9px] md:text-[10px] tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all"
               >
-                ENTRAR NO KERNEL
-                <div className="w-8 h-8 bg-neutral-950/20 rounded-lg flex items-center justify-center">
+                <span className="hidden sm:inline">ENTRAR</span>
+                <UserCircle className="w-4 h-4 sm:hidden" />
+                <div className="hidden md:flex w-8 h-8 bg-neutral-950/20 rounded-lg items-center justify-center">
                   <UserCircle className="w-4 h-4" />
                 </div>
               </button>
             )}
+
+            {/* Filtros de categoria — scroll horizontal no mobile */}
             {(activeTab === "placas" || activeTab === "componentes" || activeTab === "hardware_pc") && (
-              <div className="flex bg-neutral-900 border border-white/5 rounded-2xl p-1 shrink-0">
-                {(activeTab === "placas" 
-                  ? ["todos", "básica", "especial", "avançado"] 
-                  : activeTab === "componentes" 
+              <div className="flex bg-neutral-900 border border-white/5 rounded-2xl p-1 overflow-x-auto max-w-[180px] sm:max-w-none scrollbar-none" style={{ scrollbarWidth: "none" }}>
+                {(activeTab === "placas"
+                  ? ["todos", "básica", "especial", "avançado"]
+                  : activeTab === "componentes"
                   ? ["todos", "normal", "avançado"]
                   : ["todos", "pc master"]
                 ).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setSubTab(cat)}
-                    className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${
+                    className={`px-3 md:px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all whitespace-nowrap ${
                       subTab === cat ? "bg-white text-black shadow-lg" : "text-neutral-500 hover:text-neutral-300"
                     }`}
-                  >
-                    {cat}
-                  </button>
+                  >{cat}</button>
                 ))}
               </div>
             )}
-            <div className="flex gap-2">
-               <button className="w-10 h-10 bg-white/5 border border-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors">
-                  <Filter className="w-4 h-4 text-neutral-400" />
-               </button>
-            </div>
           </div>
         </header>
 
         {/* View Port */}
-        <div className="flex-1 overflow-y-auto p-10 viewport-scroll">
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 pb-24 md:pb-10 viewport-scroll">
           {/* Hardware Search (Refined and Prominent) */}
           {(activeTab === "placas" || activeTab === "componentes" || activeTab === "hardware_pc") && (
             <motion.div 
@@ -497,17 +580,19 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              className={`min-h-full ${activeTab === "placas" || activeTab === "componentes" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8" : "block"}`}
+              className={`min-h-full ${activeTab === "placas" || activeTab === "componentes" || activeTab === "hardware_pc" ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-8" : "block"}`}
             >
               {(activeTab === "placas" || activeTab === "componentes" || activeTab === "hardware_pc") && (
                 filteredItems.length > 0 ? (
                   filteredItems.map(item => (
-                    <HardwareCard 
-                      key={item.id} 
-                      item={item} 
-                      onAdd={addToWorkspace} 
+                    <HardwareCard
+                      key={item.id}
+                      item={item}
+                      onAdd={addToWorkspace}
                       onView={() => setModalItem(item)}
                       isAdded={selectedPlaca?.id === item.id || basket.some(b => b.id === item.id)}
+                      isMarked={getEntry(item.id).marked}
+                      onMark={() => toggleMark(item.id)}
                     />
                   ))
                 ) : (
@@ -544,15 +629,17 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
 
               {activeTab === "sobre" && <SobreView />}
               {activeTab === "configuracoes" && user && (
-                <ConfigView 
-                  theme={theme} 
-                  setTheme={setTheme} 
-                  profile={profile} 
-                  setProfile={setProfile} 
+                <ConfigView
+                  theme={theme}
+                  setTheme={setTheme}
+                  profile={profile}
+                  setProfile={setProfile}
                   user={user}
                   showToast={showToast}
                   viewMode={viewMode}
                   setViewMode={setViewMode}
+                  collection={collection}
+                  allItems={[...DATA_PLACAS, ...DATA_COMPONENTES, ...DATA_PC_HARDWARE]}
                 />
               )}
 
@@ -560,31 +647,67 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
           </AnimatePresence>
         </div>
 
-        {/* Floating Action Button */}
+        {/* Floating Action Button — sobe acima do bottom nav no mobile */}
         {basket.length > 0 && activeTab !== "workspace" && (
-          <motion.button 
+          <motion.button
             initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
             onClick={() => handleTabChange("workspace")}
-            className="absolute bottom-10 right-10 bg-cyan-500 text-neutral-950 px-8 py-5 rounded-[2rem] shadow-[0_20px_50px_rgba(6,182,212,0.3)] font-black text-xs tracking-widest flex items-center gap-4 group z-[100] hover:scale-105 active:scale-95 transition-all"
+            className="absolute bottom-24 md:bottom-10 right-4 md:right-10 bg-cyan-500 text-neutral-950 px-5 md:px-8 py-3 md:py-5 rounded-[2rem] shadow-[0_20px_50px_rgba(6,182,212,0.3)] font-black text-xs tracking-widest flex items-center gap-3 md:gap-4 group z-[100] hover:scale-105 active:scale-95 transition-all"
           >
-            <Box className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-            ABRIR LABORATÓRIO 
-            <div className="bg-neutral-950 text-cyan-400 w-8 h-8 rounded-xl flex items-center justify-center text-[10px]">
+            <Box className="w-4 md:w-5 h-4 md:h-5 group-hover:rotate-12 transition-transform" />
+            <span className="hidden sm:inline">ABRIR LABORATÓRIO</span>
+            <span className="sm:hidden">LAB</span>
+            <div className="bg-neutral-950 text-cyan-400 w-7 h-7 md:w-8 md:h-8 rounded-xl flex items-center justify-center text-[10px]">
               {basket.length + (selectedPlaca ? 1 : 0)}
             </div>
           </motion.button>
         )}
+
+        {/* ── Bottom Navigation Bar — mobile only ── */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur-2xl border-t border-white/10 flex items-center safe-area-pb">
+          {[
+            { tab: "placas" as Tab, icon: Cpu, label: "Placas" },
+            { tab: "componentes" as Tab, icon: Layers, label: "Comp." },
+            { tab: "workspace" as Tab, icon: Layout, label: "Lab", badge: basket.length + (selectedPlaca ? 1 : 0) },
+            { tab: "ia" as Tab, icon: MessageSquare, label: "IA" },
+            { tab: "configuracoes" as Tab, icon: Settings, label: "Config" },
+          ].map(({ tab, icon: Icon, label, badge }) => {
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => handleTabChange(tab)}
+                className={`flex-1 flex flex-col items-center justify-center py-3 gap-1 relative transition-all ${
+                  isActive ? "text-cyan-400" : "text-neutral-600 hover:text-neutral-400"
+                }`}
+              >
+                <div className="relative">
+                  <Icon className="w-5 h-5" />
+                  {badge != null && badge > 0 && (
+                    <span className="absolute -top-2 -right-2 w-4 h-4 bg-cyan-500 text-neutral-950 rounded-full text-[8px] font-black flex items-center justify-center">
+                      {badge}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[9px] font-black uppercase tracking-wide">{label}</span>
+                {isActive && (
+                  <motion.div layoutId="bottomNavIndicator" className="absolute top-0 inset-x-3 h-0.5 bg-cyan-400 rounded-full" />
+                )}
+              </button>
+            );
+          })}
+        </nav>
       </main>
 
-      {/* Global Detail Modal */}
+      {/* Global Detail Modal — full-screen no mobile */}
       <AnimatePresence>
         {modalItem && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-8 bg-black/90 backdrop-blur-md" onClick={() => setModalItem(null)}>
+          <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center sm:p-8 p-0 bg-black/90 backdrop-blur-md" onClick={() => setModalItem(null)}>
             <motion.div 
               initial={{ opacity: 0, y: 50, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-neutral-900 border border-white/10 rounded-[3rem] max-w-4xl w-full relative overflow-hidden shadow-[0_50px_100px_rgba(0,0,0,0.8)]"
+              className="bg-neutral-900 border border-white/10 rounded-t-[2rem] sm:rounded-[3rem] max-w-4xl w-full relative overflow-hidden shadow-[0_50px_100px_rgba(0,0,0,0.8)] max-h-[92dvh] sm:max-h-[85vh]"
               onClick={e => e.stopPropagation()}
             >
                <button onClick={() => setModalItem(null)} className="absolute top-8 right-8 w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors z-20">
@@ -711,21 +834,27 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
                       </div>
                     )}
 
-                    <div className="mt-12 flex gap-4">
-                       <button 
+                    {/* ── Projetos Guiados ── */}
+                    <ModalProjectsSection
+                      item={modalItem}
+                      entry={getEntry(modalItem.id)}
+                      isMarked={getEntry(modalItem.id).marked}
+                      onToggleMark={() => toggleMark(modalItem.id)}
+                      onToggleProject={(idx) => toggleProject(modalItem.id, idx)}
+                    />
+
+                    <div className="mt-8 flex gap-4">
+                       <button
                          onClick={() => { handleTabChange("provas"); setModalItem(null); }}
                          className="flex-1 bg-neutral-800 text-white h-16 rounded-2xl font-black tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all hover:bg-neutral-700"
                        >
                           <GraduationCap className="w-4 h-4" /> TESTAR CONHECIMENTO
                        </button>
-                       <button 
-                         onClick={() => { 
-                           if (!user) {
-                             onAuthRequired();
-                             return;
-                           }
-                           addToWorkspace(modalItem); 
-                           setModalItem(null); 
+                       <button
+                         onClick={() => {
+                           if (!user) { onAuthRequired(); return; }
+                           addToWorkspace(modalItem);
+                           setModalItem(null);
                          }}
                          className="flex-[2] bg-white text-neutral-950 h-16 rounded-2xl font-black tracking-widest text-xs flex items-center justify-center gap-3 transition-transform active:scale-95 hover:bg-cyan-500 shadow-xl"
                         >
@@ -798,7 +927,7 @@ function SobreView() {
   );
 }
 
-function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, viewMode, setViewMode }: any) {
+function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, viewMode, setViewMode, collection, allItems }: any) {
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
@@ -933,7 +1062,7 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
   };
 
   return (
-    <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 pb-40">
+    <div className="max-w-6xl mx-auto space-y-12 pb-40"><div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
       <div className="lg:col-span-4 space-y-8">
         <div className="p-12 bg-neutral-900/40 rounded-[4rem] border border-white/5 flex flex-col items-center text-center shadow-2xl relative overflow-hidden">
           <div className="w-32 h-32 bg-neutral-950 border-2 border-cyan-500/30 rounded-[2.5rem] flex items-center justify-center mb-6 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.2)]">
@@ -1152,6 +1281,289 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
           </button>
         </div>
       </div>
+
+      </div>{/* fim grid 12 cols */}
+
+      {/* ── Coleção & Progresso ── */}
+      {collection && allItems && (
+        <CollectionProgress collection={collection} allItems={allItems} />
+      )}
+    </div>
+  );
+}
+
+function CollectionProgress({ collection, allItems }: { collection: CollectionState; allItems: HardwareItem[] }) {
+  const [filter, setFilter] = React.useState<"all"|"marked"|"progress">("marked");
+  const [openItem, setOpenItem] = React.useState<string | null>(null);
+
+  const markedItems = allItems.filter(i => collection[i.id]?.marked);
+  const progressItems = allItems.filter(i => (collection[i.id]?.completedProjects?.length ?? 0) > 0);
+  const totalProjects = allItems.reduce((a, i) => a + (collection[i.id]?.completedProjects?.length ?? 0), 0);
+
+  const displayed = filter === "marked" ? markedItems : filter === "progress" ? progressItems : allItems.filter(i => collection[i.id]);
+
+  return (
+    <div className="lg:col-span-12 p-10 bg-neutral-900/40 rounded-[3rem] border border-white/5 shadow-2xl mt-0 space-y-8">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h3 className="text-xl font-black flex items-center gap-4 text-white uppercase text-left">
+          <FolderOpen className="w-6 h-6 text-amber-400" /> COLEÇÃO &amp; HISTÓRICO DE PROJETOS
+        </h3>
+        <div className="flex gap-3 text-[10px] font-black uppercase tracking-widest">
+          <span className="text-neutral-500">⭐ {markedItems.length} itens coletados</span>
+          <span className="text-neutral-500">|</span>
+          <span className="text-neutral-500">✓ {totalProjects} projetos concluídos</span>
+        </div>
+      </div>
+
+      {/* Stats rápidos */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: "Coletados", val: markedItems.length, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
+          { label: "Com progresso", val: progressItems.length, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
+          { label: "Projetos feitos", val: totalProjects, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+        ].map(s => (
+          <div key={s.label} className={`p-6 rounded-2xl border ${s.bg} text-center space-y-1`}>
+            <p className={`text-3xl font-black ${s.color}`}>{s.val}</p>
+            <p className="text-[9px] font-black text-neutral-500 uppercase tracking-widest">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros */}
+      <div className="flex bg-neutral-950 rounded-2xl p-1 gap-1 w-fit">
+        {(["marked","progress","all"] as const).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${filter===f?"bg-white text-black":"text-neutral-500 hover:text-white"}`}>
+            {f==="marked"?"⭐ Coleção":f==="progress"?"📊 Em progresso":"📋 Todos"}
+          </button>
+        ))}
+      </div>
+
+      {/* Lista */}
+      {displayed.length === 0 ? (
+        <div className="text-center py-12 text-neutral-600">
+          <BadgeCheck className="w-12 h-12 mx-auto mb-4 opacity-20" />
+          <p className="font-black uppercase tracking-widest text-sm">Nenhum item aqui ainda</p>
+          <p className="text-[10px] mt-2 uppercase">Clique em ⭐ nos cards de componentes e placas para coletar</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {displayed.map(item => {
+            const entry = collection[item.id] ?? { marked: false, markedAt: null, completedProjects: [] };
+            const done = entry.completedProjects.length;
+            const pct = Math.round((done / 10) * 100);
+            const isOpen = openItem === item.id;
+            return (
+              <div key={item.id} className={`rounded-2xl border overflow-hidden ${entry.marked?"border-amber-500/20":"border-white/5"}`}>
+                <button className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors text-left"
+                  onClick={() => setOpenItem(isOpen ? null : item.id)}>
+                  <img src={item.image} className="w-12 h-12 rounded-xl object-cover border border-white/10 shrink-0" referrerPolicy="no-referrer" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-sm text-white truncate">{item.nome}</span>
+                      {entry.marked && <BadgeCheck className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                      <span className="text-[8px] text-neutral-600 font-black uppercase px-2 py-0.5 bg-neutral-900 rounded">{item.tipo}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <div className="flex-1 h-1.5 bg-neutral-900 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all" style={{ width:`${pct}%` }} />
+                      </div>
+                      <span className="text-[9px] font-black text-neutral-500 uppercase shrink-0">{done}/10 projetos</span>
+                    </div>
+                  </div>
+                  {entry.markedAt && (
+                    <span className="text-[8px] text-neutral-600 font-bold shrink-0 hidden md:block">
+                      {new Date(entry.markedAt).toLocaleDateString("pt-BR")}
+                    </span>
+                  )}
+                  <ChevronDown className={`w-4 h-4 text-neutral-600 shrink-0 transition-transform ${isOpen?"rotate-180":""}`} />
+                </button>
+                {isOpen && (
+                  <div className="border-t border-white/5 p-4 bg-neutral-950/40">
+                    <p className="text-[9px] font-black text-neutral-500 uppercase tracking-widest mb-3">Projetos concluídos:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Array.from({length:10},(_,i)=>(
+                        <span key={i} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border transition-all ${
+                          entry.completedProjects.includes(i)
+                            ?"bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                            :"bg-neutral-900 border-white/5 text-neutral-700"
+                        }`}>
+                          Proj {String(i+1).padStart(2,"0")} {entry.completedProjects.includes(i)?"✓":""}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Seção de Projetos no Modal ─────────────────────────────────────────────
+function ModalProjectsSection({ item, entry, isMarked, onToggleMark, onToggleProject }: {
+  item: HardwareItem;
+  entry: { marked: boolean; markedAt: string | null; completedProjects: number[] };
+  isMarked: boolean;
+  onToggleMark: () => void;
+  onToggleProject: (idx: number) => void;
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [activeProj, setActiveProj] = React.useState<number | null>(null);
+  const [copiedIdx, setCopiedIdx] = React.useState<number | null>(null);
+  const projects = getProjectsForComponent(item);
+  const done = entry.completedProjects.length;
+  const pct = Math.round((done / 10) * 100);
+
+  const copyCode = (code: string, idx: number) => {
+    navigator.clipboard.writeText(code);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  const diffColor = (d: string) =>
+    d === "Iniciante" ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+    : d === "Intermediário" ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+    : "text-red-400 bg-red-500/10 border-red-500/20";
+
+  return (
+    <div className="mt-10 pt-10 border-t border-white/5 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-3 text-lg font-black text-white uppercase tracking-tight hover:text-cyan-400 transition-colors"
+          >
+            <BookMarked className="w-5 h-5 text-cyan-400" />
+            10 PROJETOS GUIADOS
+            <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
+          </button>
+          <span className="text-[9px] font-black text-neutral-600 uppercase tracking-widest">{done}/10 concluídos</span>
+        </div>
+        {/* Botão coleção */}
+        <button
+          onClick={onToggleMark}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+            isMarked
+              ? "bg-cyan-500 border-cyan-500 text-neutral-950 shadow-lg shadow-cyan-500/20"
+              : "bg-neutral-900 border-white/10 text-neutral-400 hover:border-cyan-500/40 hover:text-cyan-400"
+          }`}
+        >
+          <BadgeCheck className="w-3.5 h-3.5" />
+          {isMarked ? "NA COLEÇÃO" : "COLETAR"}
+        </button>
+      </div>
+
+      {/* Barra de progresso */}
+      <div>
+        <div className="flex justify-between text-[9px] font-black text-neutral-600 uppercase tracking-widest mb-2">
+          <span>Progresso dos projetos</span><span>{pct}%</span>
+        </div>
+        <div className="h-2 bg-neutral-900 rounded-full overflow-hidden border border-white/5">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${pct}%` }}
+            className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400"
+          />
+        </div>
+      </div>
+
+      {/* Lista de projetos */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden space-y-3"
+          >
+            {projects.map((proj, idx) => {
+              const isDone = entry.completedProjects.includes(idx);
+              const isOpen = activeProj === idx;
+              return (
+                <div key={proj.id} className={`rounded-2xl border overflow-hidden transition-all ${isDone ? "border-emerald-500/20 bg-emerald-500/5" : "border-white/5 bg-neutral-950/40"}`}>
+                  {/* Projeto header */}
+                  <div className="flex items-center gap-3 p-4">
+                    {/* Checkbox */}
+                    <button
+                      onClick={() => onToggleProject(idx)}
+                      className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${isDone ? "bg-emerald-500 border-emerald-500" : "border-white/20 hover:border-emerald-500/50"}`}
+                    >
+                      {isDone && <CheckCircle2 className="w-4 h-4 text-white" />}
+                    </button>
+                    {/* Info */}
+                    <button className="flex-1 text-left" onClick={() => setActiveProj(isOpen ? null : idx)}>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className={`font-black text-sm ${isDone ? "text-emerald-400 line-through opacity-60" : "text-white"}`}>
+                          {String(idx + 1).padStart(2, "0")}. {proj.title}
+                        </span>
+                        <span className={`text-[8px] font-black px-2 py-0.5 rounded border uppercase ${diffColor(proj.difficulty)}`}>{proj.difficulty}</span>
+                        <span className="text-[8px] text-neutral-600 font-bold uppercase">{proj.time}</span>
+                      </div>
+                      <p className="text-[10px] text-neutral-500 mt-1 font-medium">{proj.description}</p>
+                    </button>
+                    <ChevronDown className={`w-4 h-4 text-neutral-600 transition-transform shrink-0 ${isOpen ? "rotate-180" : ""}`} onClick={() => setActiveProj(isOpen ? null : idx)} />
+                  </div>
+
+                  {/* Projeto expandido */}
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden border-t border-white/5"
+                      >
+                        <div className="p-5 space-y-4">
+                          {/* Conexões */}
+                          <div>
+                            <p className="text-[9px] font-black text-cyan-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                              <Zap className="w-3 h-3" /> CONEXÕES
+                            </p>
+                            <p className="text-xs font-mono text-neutral-400 bg-neutral-950/60 rounded-xl p-3 leading-relaxed">{proj.connections}</p>
+                          </div>
+                          {/* Código */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                                <Terminal className="w-3 h-3" /> CÓDIGO COMPLETO
+                              </p>
+                              <button
+                                onClick={() => copyCode(proj.code, idx)}
+                                className="text-[8px] font-black uppercase tracking-widest text-cyan-500 hover:text-white transition-colors flex items-center gap-1"
+                              >
+                                <Save className="w-3 h-3" />
+                                {copiedIdx === idx ? "COPIADO!" : "COPIAR"}
+                              </button>
+                            </div>
+                            <pre className="bg-neutral-950 rounded-xl p-4 text-[10px] font-mono text-neutral-300 overflow-x-auto leading-relaxed max-h-96 overflow-y-auto scrollbar-visible whitespace-pre-wrap">
+                              {proj.code}
+                            </pre>
+                          </div>
+                          {/* Marcar concluído */}
+                          <button
+                            onClick={() => onToggleProject(idx)}
+                            className={`w-full h-10 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                              isDone ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
+                                     : "bg-cyan-500 text-neutral-950 hover:scale-[1.02] active:scale-95"
+                            }`}
+                          >
+                            {isDone ? "✓ CONCLUÍDO — Clique para desmarcar" : "MARCAR COMO CONCLUÍDO"}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1175,11 +1587,11 @@ function NavItem({ icon: Icon, label, active, onClick, badge }: any) {
   );
 }
 
-function HardwareCard({ item, onAdd, onView, isAdded }: { item: HardwareItem, onAdd: any, onView: any, isAdded: boolean }) {
+function HardwareCard({ item, onAdd, onView, isAdded, isMarked, onMark }: { item: HardwareItem, onAdd: any, onView: any, isAdded: boolean, isMarked?: boolean, onMark?: () => void }) {
   return (
     <motion.div 
       layout
-      className="group bg-neutral-900/30 border border-white/5 rounded-[2.5rem] overflow-hidden p-6 hover:border-cyan-500/40 transition-all hover:bg-neutral-900 shadow-xl relative"
+      className="group bg-neutral-900/30 border border-white/5 rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden p-3 sm:p-6 hover:border-cyan-500/40 transition-all hover:bg-neutral-900 shadow-xl relative"
     >
       <div className="relative aspect-square overflow-hidden rounded-3xl mb-6 bg-neutral-950 p-2 border border-white/5">
         <img 
@@ -1193,9 +1605,23 @@ function HardwareCard({ item, onAdd, onView, isAdded }: { item: HardwareItem, on
             {item.tipo}
           </span>
         </div>
+        {/* Botão Coleção */}
+        {onMark && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onMark(); }}
+            className={`absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+              isMarked
+                ? "bg-cyan-500 text-neutral-950 shadow-lg shadow-cyan-500/30"
+                : "bg-neutral-950/80 text-neutral-600 hover:text-cyan-400 hover:bg-neutral-900"
+            }`}
+            title={isMarked ? "Remover da coleção" : "Adicionar à coleção"}
+          >
+            <BadgeCheck className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
-      <h3 className="font-black text-xl mb-3 truncate group-hover:text-cyan-400 transition-colors uppercase tracking-tight pr-4">{item.nome}</h3>
+      <h3 className="font-black text-sm sm:text-xl mb-2 sm:mb-3 truncate group-hover:text-cyan-400 transition-colors uppercase tracking-tight pr-4">{item.nome}</h3>
       <div className="relative">
         <p className="text-neutral-500 text-[11px] line-clamp-6 mb-8 leading-relaxed font-medium uppercase tracking-wide opacity-60 group-hover:opacity-100 transition-opacity">
           {item.info}
@@ -1359,16 +1785,9 @@ function IAPanel() {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const readyResponses = [
-    "Como ligar um LED no Arduino?",
-    "Como conectar ESP32 ao WiFi?",
-    "O que é o protocolo I2C?",
-    "Como usar sensor DHT22?",
-    "Como usar sensor ultrassônico?",
-    "O que é MQTT?",
-    "Como usar deep sleep ESP32?",
-    "Como calcular resistor para LED?",
-  ];
+  // Guided mode state
+  const [activeCategory, setActiveCategory] = useState<GuidedCategory | null>(null);
+  const [mode, setMode] = useState<"guided" | "free">("guided");
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -1421,48 +1840,156 @@ function IAPanel() {
   };
 
   return (
-    <div className="bg-neutral-900 border border-white/5 rounded-[4rem] h-[80vh] flex flex-col overflow-hidden shadow-2xl">
-      <div className="px-10 py-8 bg-neutral-950/50 border-b border-white/5 flex items-center gap-6">
-        <div className="w-14 h-14 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center justify-center animate-pulse">
-          <img src="/logo.png" className="w-8 h-8 object-cover" />
+    <div className="bg-neutral-900 border border-white/5 rounded-[4rem] flex flex-col overflow-hidden shadow-2xl" style={{ height: "calc(100vh - 200px)", minHeight: "600px" }}>
+
+      {/* ── Header ── */}
+      <div className="px-8 py-6 bg-neutral-950/60 border-b border-white/5 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center justify-center animate-pulse shrink-0">
+            <img src="/logo.png" className="w-7 h-7 object-cover" />
+          </div>
+          <div>
+            <h3 className="text-base font-black tracking-tight text-white uppercase">DEVGENIUS IA</h3>
+            <p className="text-[9px] text-emerald-500 font-black uppercase tracking-widest">150 respostas embutidas // Modo {mode === "guided" ? "Guiado" : "Livre"}</p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-xl font-black tracking-tight text-white uppercase">ASSISTENTE DEVGENIUS IA</h3>
-          <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">150 respostas embutidas // Gemini como fallback</p>
+        {/* Mode toggle */}
+        <div className="flex bg-neutral-900 border border-white/5 rounded-2xl p-1 gap-1">
+          <button
+            onClick={() => setMode("guided")}
+            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${mode === "guided" ? "bg-cyan-500 text-neutral-950" : "text-neutral-500 hover:text-white"}`}
+          >
+            <Layers className="w-3 h-3" /> Guiado
+          </button>
+          <button
+            onClick={() => setMode("free")}
+            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${mode === "free" ? "bg-cyan-500 text-neutral-950" : "text-neutral-500 hover:text-white"}`}
+          >
+            <MessageSquare className="w-3 h-3" /> Livre
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-12 space-y-8 scrollbar-visible" ref={scrollRef}>
+      {/* ── Guided Panel ── */}
+      <AnimatePresence>
+        {mode === "guided" && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="shrink-0 border-b border-white/5 overflow-hidden"
+          >
+            {/* Category row */}
+            <div className="px-6 pt-4 pb-3">
+              <p className="text-[9px] font-black text-neutral-600 uppercase tracking-[0.2em] mb-3">CATEGORIAS</p>
+              <div className="flex flex-wrap gap-2">
+                {IA_GUIDED_CATEGORIES.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(activeCategory?.id === cat.id ? null : cat)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${
+                      activeCategory?.id === cat.id
+                        ? "bg-cyan-500 border-cyan-500 text-neutral-950 shadow-lg shadow-cyan-500/20"
+                        : "bg-neutral-950/60 border-white/5 text-neutral-400 hover:border-cyan-500/40 hover:text-white"
+                    }`}
+                  >
+                    <span className="text-sm leading-none">{cat.emoji}</span>
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Questions chips — appear when category selected */}
+            <AnimatePresence>
+              {activeCategory && (
+                <motion.div
+                  key={activeCategory.id}
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-6 pb-4">
+                    <div className="bg-neutral-950/40 rounded-2xl border border-white/5 p-4">
+                      <p className="text-[9px] font-black text-cyan-500 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                        <span>{activeCategory.emoji}</span> {activeCategory.label} — {activeCategory.desc}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {activeCategory.questions.map((qItem) => (
+                          <button
+                            key={qItem.label}
+                            onClick={() => {
+                              onSend(qItem.question);
+                              setActiveCategory(null);
+                            }}
+                            disabled={loading}
+                            className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-wide text-neutral-300 hover:bg-cyan-500 hover:text-neutral-950 hover:border-cyan-500 transition-all disabled:opacity-30"
+                          >
+                            {qItem.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Chat Messages ── */}
+      <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-visible" ref={scrollRef}>
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center gap-6 mt-10">
-             <div className="w-24 h-24 bg-cyan-500/5 rounded-[2rem] flex items-center justify-center border border-cyan-500/10">
-                <Sparkles className="w-12 h-12 text-cyan-400 animate-pulse" />
-             </div>
-             <p className="text-xl font-black uppercase tracking-widest max-w-sm text-neutral-500">O que deseja projetar hoje?</p>
-             
-             <div className="flex flex-wrap justify-center gap-3 max-w-2xl mt-4">
-                {readyResponses.map(r => (
-                  <button 
-                    key={r} 
+          <div className="h-full flex flex-col items-center justify-center text-center gap-5">
+            <div className="w-20 h-20 bg-cyan-500/5 rounded-[2rem] flex items-center justify-center border border-cyan-500/10">
+              <Sparkles className="w-10 h-10 text-cyan-400 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-black uppercase tracking-widest text-neutral-400">
+                {mode === "guided" ? "Escolha uma categoria acima" : "O que deseja projetar hoje?"}
+              </p>
+              <p className="text-[10px] text-neutral-600 uppercase tracking-widest">
+                {mode === "guided"
+                  ? "Selecione uma categoria → clique na pergunta → veja a resposta"
+                  : "Digite sua dúvida ou use o modo GUIADO para navegar por categorias"}
+              </p>
+            </div>
+            {mode === "free" && (
+              <div className="flex flex-wrap justify-center gap-2 max-w-xl mt-2">
+                {["Como ligar LED no Arduino?", "Como usar WiFi no ESP32?", "O que é protocolo I2C?", "Como usar sensor DHT22?"].map(r => (
+                  <button
+                    key={r}
                     onClick={() => onSend(r)}
-                    className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:bg-cyan-500 hover:text-neutral-950 hover:border-cyan-500 transition-all"
+                    className="px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-neutral-400 hover:bg-cyan-500 hover:text-neutral-950 hover:border-cyan-500 transition-all"
                   >
                     {r}
                   </button>
                 ))}
-             </div>
+              </div>
+            )}
           </div>
         )}
-        
+
         {messages.map((m, i) => (
-          <motion.div 
-            key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          <motion.div
+            key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
             className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
           >
-            <div className={`max-w-[80%] rounded-[2rem] p-8 text-sm font-medium leading-relaxed ${
-              m.role === "user" ? "bg-cyan-500 text-neutral-950 font-bold" : "bg-neutral-800/50 border border-white/5 text-neutral-300"
+            {m.role === "ia" && (
+              <div className="w-8 h-8 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-center mr-3 mt-1 shrink-0">
+                <img src="/logo.png" className="w-5 h-5 object-cover" />
+              </div>
+            )}
+            <div className={`max-w-[78%] rounded-[1.5rem] px-6 py-5 text-sm font-medium leading-relaxed ${
+              m.role === "user"
+                ? "bg-cyan-500 text-neutral-950 font-bold rounded-br-sm"
+                : "bg-neutral-800/60 border border-white/5 text-neutral-300 rounded-bl-sm"
             }`}>
-              <div className="prose prose-invert prose-sm max-w-none">
+              <div className="prose prose-invert prose-sm max-w-none prose-headings:text-cyan-400 prose-headings:font-black prose-strong:text-white prose-code:text-cyan-300 prose-code:bg-neutral-950/60 prose-code:px-1 prose-code:rounded">
                 <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{m.content}</ReactMarkdown>
               </div>
             </div>
@@ -1470,40 +1997,48 @@ function IAPanel() {
         ))}
 
         {loading && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-            <div className="bg-neutral-800/50 border border-white/5 rounded-[2rem] p-8 flex items-center gap-4">
-               <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
-               <span className="text-xs font-black uppercase tracking-widest text-neutral-500">DevGenius IA processando...</span>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start items-center gap-3">
+            <div className="w-8 h-8 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-center shrink-0">
+              <img src="/logo.png" className="w-5 h-5 object-cover" />
+            </div>
+            <div className="bg-neutral-800/50 border border-white/5 rounded-[1.5rem] rounded-bl-sm px-6 py-4 flex items-center gap-3">
+              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+              <span className="text-xs font-black uppercase tracking-widest text-neutral-500">Buscando resposta...</span>
             </div>
           </motion.div>
         )}
       </div>
 
-      <div className="p-10 bg-neutral-950/80 backdrop-blur-2xl border-t border-white/5">
+      {/* ── Input ── */}
+      <div className="px-6 py-4 bg-neutral-950/80 backdrop-blur-2xl border-t border-white/5 shrink-0">
         <div className="relative">
-          <textarea 
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if(e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
-            placeholder="Digite sua dúvida técnica..."
-            className="w-full bg-neutral-900 border border-white/10 rounded-3xl pl-8 pr-20 py-6 text-sm font-medium focus:outline-none focus:border-cyan-500/50 transition-all min-h-[90px] max-h-40 resize-none text-white"
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
+            placeholder={mode === "guided" ? "Ou digite qualquer dúvida técnica..." : "Digite sua dúvida técnica..."}
+            className="w-full bg-neutral-900 border border-white/10 rounded-2xl pl-6 pr-16 py-4 text-sm font-medium focus:outline-none focus:border-cyan-500/50 transition-all min-h-[70px] max-h-32 resize-none text-white placeholder:text-neutral-600"
           />
-          <button 
+          <button
             onClick={() => onSend()}
             disabled={loading || !input.trim()}
-            className="absolute right-4 bottom-4 w-12 h-12 bg-cyan-500 text-neutral-950 rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl disabled:opacity-20"
+            className="absolute right-3 bottom-3 w-10 h-10 bg-cyan-500 text-neutral-950 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-20"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-center text-[9px] text-neutral-700 font-bold uppercase tracking-widest mt-6">150 Q&A EMBUTIDAS // MATCHING POR PALAVRAS-CHAVE // GEMINI COMO BACKUP</p>
+        <p className="text-center text-[8px] text-neutral-700 font-bold uppercase tracking-widest mt-3">
+          {messages.length > 0
+            ? `${messages.filter(m => m.role === "user").length} pergunta(s) nesta sessão // 150 Q&A embutidas`
+            : "150 Q&A EMBUTIDAS // MATCHING POR PALAVRAS-CHAVE // GEMINI COMO BACKUP"}
+        </p>
       </div>
     </div>
   );
 }
 
 function CodeSnippets({ activeTab: dashboardTab, setActiveTab }: { activeTab: string, setActiveTab: (t: any) => void }) {
-  const [activeLang, setActiveLang] = useState<"cpp" | "js">("cpp");
+  const [activeLang, setActiveLang] = useState<"cpp" | "js" | "py">("cpp");
   const [activePart, setActivePart] = useState(0);
 
   const CONTENT = {
@@ -1649,6 +2184,144 @@ Use seus poderes para o bem e para o avanço da humanidade.
 O código é eterno, o conhecimento é infinito.
 Parabéns por completar a trilha de elite do DEVGENIUS.`
       }
+    ],
+    py: [
+      {
+        title: "PYTHON FUNDAMENTOS E HARDWARE",
+        text: `Python é uma das linguagens mais versáteis do mundo da tecnologia moderna, e no contexto de hardware e IoT ela se tornou indispensável. Sua sintaxe limpa, legibilidade excepcional e enorme ecossistema de bibliotecas fazem de Python a escolha ideal tanto para iniciantes quanto para engenheiros experientes que precisam de prototipagem rápida.
+A história de Python começa em 1991, criada por Guido van Rossum como sucessora da linguagem ABC. O nome homenageia o grupo de comédia Monty Python. Hoje, Python está em sua versão 3.x (3.11+ recomendado), com melhorias significativas de performance, tipagem e mensagens de erro.
+O interpretador Python executa código linha a linha, tornando o debugging interativo possível. O REPL (Read-Eval-Print Loop) do Python — acessível simplesmente digitando 'python' no terminal — permite testar expressões instantaneamente, algo valioso ao trabalhar com hardware.
+Variáveis em Python não precisam de declaração explícita de tipo: x = 42 cria um inteiro; x = 3.14 cria um float; x = "texto" cria uma string. Isso é chamado de tipagem dinâmica. Python é fortemente tipado (não converte implicitamente tipos incompatíveis) mas dinamicamente tipado (tipos são verificados em runtime, não em compilação).
+Os tipos primitivos de Python incluem: int (inteiros de precisão arbitrária — sem overflow!), float (ponto flutuante IEEE 754 de 64 bits), complex (números complexos: 3+4j), bool (True/False, subclasse de int), str (strings Unicode imutáveis), bytes (sequência de bytes imutável) e bytearray (sequência de bytes mutável, essencial para buffers de comunicação serial).
+Operadores aritméticos: + (soma), - (subtração), * (multiplicação), / (divisão real), // (divisão inteira), % (módulo/resto), ** (potência). Note que 7/2 = 3.5 (float), mas 7//2 = 3 (int). Isso difere de C/C++.
+Strings em Python são imutáveis e suportam fatiamento (slicing): s[0] é o primeiro caractere, s[-1] é o último, s[1:4] são os caracteres de índice 1 a 3, s[::2] são os caracteres em índices pares. F-strings (formatted strings literals) são a forma moderna de formatar: f"Temperatura: {temp:.2f} °C" — mais rápido e legível que .format() ou %.
+Listas são coleções ordenadas e mutáveis: minha_lista = [1, 2.5, "texto", True]. Métodos importantes: append(x) adiciona ao final, insert(i, x) insere na posição i, pop() remove e retorna o último, remove(x) remove a primeira ocorrência de x, sort() ordena in-place, sorted() retorna nova lista ordenada, len() retorna o tamanho.
+Tuples são como listas mas imutáveis: ponto = (10.5, 20.3). Usadas para coordenadas, retornos múltiplos de funções (Python desempacota automaticamente: x, y = obter_posicao()) e como chaves de dicionário.
+Dicionários são coleções de pares chave:valor não ordenados (Python 3.7+ mantém ordem de inserção): sensor = {"nome": "DHT22", "pin": 4, "ativo": True}. Acesso: sensor["nome"]. Métodos: keys(), values(), items(), get(chave, padrao), update(outro_dict). Compreensão de dicionário: {k: v*2 for k, v in dados.items()}.
+Sets (conjuntos) armazenam elementos únicos não ordenados: dispositivos = {"esp32", "arduino", "rpi"}. Operações de teoria dos conjuntos: union (|), intersection (&), difference (-), symmetric_difference (^). Úteis para remover duplicatas: lista_unica = list(set(lista_com_duplicatas)).
+Controle de fluxo com if/elif/else usa indentação obrigatória (4 espaços por convenção PEP 8): if temperatura > 80: ativar_alerta(). Python não tem switch/case tradicional — use if/elif encadeado ou dicionário de dispatch. Python 3.10+ introduz match/case (pattern matching estrutural).
+Laços for iteram sobre qualquer iterável: for item in lista: — nativo e idiomático. range(start, stop, step) gera sequência: for i in range(0, 100, 5). enumerate() fornece índice e valor: for i, v in enumerate(lista). zip() combina iteráveis: for a, b in zip(lista1, lista2).
+Laços while executam enquanto condição for verdadeira: while not sensor.pronto(): aguardar(). break sai do laço imediatamente; continue passa para a próxima iteração; else após while/for executa quando o laço termina naturalmente (sem break) — pouco conhecido mas útil.
+Funções são definidas com def: def calcular_distancia(duracao_us): return duracao_us * 0.034 / 2. Argumentos padrão: def conectar(ssid, senha, timeout=30). Argumentos keyword: conectar(ssid="MinhaRede", senha="123"). *args captura argumentos posicionais variáveis como tupla; **kwargs captura argumentos keyword como dict.
+Funções lambda são anônimas e de expressão única: quadrado = lambda x: x**2. Usadas com map(), filter(), sorted(): lista_ordenada = sorted(sensores, key=lambda s: s["temperatura"], reverse=True).
+List comprehensions são pythônicas e eficientes: temperaturas_celsius = [(f - 32) * 5/9 for f in temperaturas_fahrenheit]. Generator expressions (parênteses em vez de colchetes) são lazy e economizam memória: soma = sum(x**2 for x in range(1000000)).
+Módulos são arquivos .py que contêm definições. Importação: import time; from machine import Pin, I2C; from time import sleep, ticks_ms. Alias: import numpy as np. Pacotes são diretórios com __init__.py. pip é o gerenciador de pacotes: pip install requests pyserial adafruit-blinka.
+Ambientes virtuais isolam dependências de projetos: python -m venv meu_projeto; source meu_projeto/bin/activate (Linux/Mac) ou meu_projeto\Scripts\activate (Windows). requirements.txt lista dependências: pip freeze > requirements.txt; pip install -r requirements.txt.
+Tratamento de exceções com try/except/finally: try: dados = serial.readline(); except SerialException as e: logging.error(f"Erro serial: {e}"); finally: serial.close(). raise re-lança exceções. Crie exceções personalizadas: class SensorError(Exception): pass.
+Classes e orientação a objetos em Python: class Sensor: def __init__(self, pin, tipo): self.pin = pin; self.tipo = tipo. self é a referência ao objeto (como this em C++). Herança: class DHT22(Sensor): pass. super().__init__() chama o construtor da classe pai. Dunder methods (__repr__, __str__, __len__, __eq__) personalizam comportamento.
+Property decorators criam getters/setters elegantes: @property def temperatura(self): return self._temp; @temperatura.setter def temperatura(self, v): if -40<=v<=80: self._temp=v. Encapsulamento sem getters/setters explícitos — código pythônico.
+MicroPython é uma implementação compacta de Python 3 para microcontroladores com poucos recursos. Roda em ESP32, ESP8266, Raspberry Pi Pico, STM32, nRF52840 e outros. Ocupa tipicamente 256 KB de Flash e 16 KB de RAM. Subconjunto da biblioteca padrão Python + módulos específicos de hardware (machine, network, uasyncio).
+No MicroPython, o módulo machine é o coração do controle de hardware: from machine import Pin, I2C, SPI, ADC, PWM, UART, Timer. Pin(14, Pin.OUT) cria saída digital. Pin(2, Pin.IN, Pin.PULL_UP) cria entrada com pull-up. pin.value(1) liga; pin.value(0) desliga; pin.value() lê o estado.
+PWM em MicroPython: pwm = PWM(Pin(13)); pwm.freq(1000); pwm.duty(512). duty vai de 0 a 1023 (10 bits) no ESP8266, 0 a 65535 (16 bits resolução) no ESP32 com duty_u16(). Para servos: pwm.freq(50); pwm.duty_u16(int(duty_ciclo * 65535)).
+ADC (analógico) em MicroPython no ESP32: adc = ADC(Pin(36)); adc.atten(ADC.ATTN_11DB); adc.width(ADC.WIDTH_12BIT); valor = adc.read(). Tensão: tensao = valor * 3.3 / 4095. Pinos ADC válidos: 32-39 (somente leitura no ESP32).
+I2C em MicroPython: i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=400000). Scan: i2c.scan() retorna lista de endereços hex. Escrita: i2c.writeto(addr, bytes([reg, valor])). Leitura: dados = i2c.readfrom_mem(addr, reg, num_bytes). Biblioteca de alto nível para OLED SSD1306: import ssd1306; display = ssd1306.SSD1306_I2C(128, 64, i2c).
+SPI em MicroPython: spi = SPI(1, baudrate=8000000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(23), miso=Pin(19)). cs = Pin(5, Pin.OUT); cs.value(0); spi.write(b'\x02\x00'); spi.readinto(buf); cs.value(1). Para SD card: import sdcard, uos; sd = sdcard.SDCard(spi, cs); uos.mount(sd, '/sd').
+UART em MicroPython: uart = UART(2, baudrate=9600, tx=Pin(17), rx=Pin(16)); uart.write('Olá\n'); dados = uart.readline(). uart.any() retorna número de bytes disponíveis. Padrão para comunicação com módulos GPS, GSM, displays seriais.
+Comunicação serial com pyserial em Python desktop: import serial; ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1); ser.write(b'LED:ON\n'); resposta = ser.readline().decode('utf-8').strip(). Enumerate portas: from serial.tools.list_ports import comports; [print(p) for p in comports()].
+RPi.GPIO para Raspberry Pi: import RPi.GPIO as GPIO; GPIO.setmode(GPIO.BCM); GPIO.setup(18, GPIO.OUT); GPIO.output(18, GPIO.HIGH). GPIO.input(24) lê pino. GPIO.add_event_detect(24, GPIO.RISING, callback=minha_funcao, bouncetime=200) para interrupções. GPIO.cleanup() no finally para liberar pinos.
+gpiozero é biblioteca de alto nível para RPi: from gpiozero import LED, Button, DistanceSensor, RotaryEncoder; led = LED(18); led.on(); led.blink(on_time=0.5, off_time=0.5). DistanceSensor: sensor = DistanceSensor(echo=24, trigger=23); print(sensor.distance). Mais simples que RPi.GPIO puro.
+smbus2 para I2C no Raspberry Pi: from smbus2 import SMBus; with SMBus(1) as bus: bus.write_byte_data(0x68, 0x6B, 0); data = bus.read_i2c_block_data(0x68, 0x3B, 14). Biblioteca alternativa de alto nível: from adafruit_extended_bus import ExtendedI2C; i2c = ExtendedI2C(1).
+spidev para SPI no Raspberry Pi: import spidev; spi = spidev.SpiDev(); spi.open(0, 0); spi.max_speed_hz = 1000000; resp = spi.xfer2([0x02, 0x00, 0xFF]); spi.close(). Para MCP3208 ADC: def ler_canal(ch): return spi.xfer2([0x06|(ch>>2), (ch&3)<<6, 0])[1]&0xF<<8|spi.xfer2(...)[2].
+Threading em Python para múltiplas tarefas: import threading; t = threading.Thread(target=ler_sensor, args=(sensor,), daemon=True); t.start(). Lock para seção crítica: lock = threading.Lock(); with lock: dados_compartilhados.append(valor). Event para sincronização: evento = threading.Event(); evento.set(); evento.wait(). Queue para comunicação thread-safe: from queue import Queue; fila = Queue(maxsize=100); fila.put(leitura); dado = fila.get(timeout=5).
+asyncio para IO assíncrono (uasyncio no MicroPython): import asyncio. async def ler_sensor(): await asyncio.sleep(1); return sensor.read(). asyncio.run(main()). gather() para tarefas paralelas: await asyncio.gather(tarefa1(), tarefa2()). create_task() para tarefas em background. No MicroPython: loop = uasyncio.get_event_loop(); loop.create_task(coro); loop.run_forever().
+Socket programming para comunicação de rede: import socket; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.connect(('192.168.1.100', 8080)); s.sendall(b'GET /sensor HTTP/1.0\r\n\r\n'); resp = s.recv(1024); s.close(). UDP: socket.SOCK_DGRAM; s.sendto(dados, (ip, porta)).
+JSON em Python: import json; dados_str = json.dumps({"temp": 25.3, "umid": 65}); dados_dict = json.loads(resposta_servidor). json.dump(objeto, arquivo) e json.load(arquivo) para persistência em arquivo. indent=2 para formatação legível: json.dumps(dados, indent=2, ensure_ascii=False).
+Logging para aplicações robustas: import logging; logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s', filename='app.log'); logging.debug('Iniciando sensor'); logging.warning('Temperatura alta: %.1f', temp); logging.critical('Falha de comunicação'). RotatingFileHandler para limitar tamanho do log.
+Arquivos e I/O: with open('dados.csv', 'a') as f: f.write(f"{timestamp},{temp},{umid}\n"). pathlib é mais moderna que os.path: from pathlib import Path; p = Path('/home/pi/logs'); p.mkdir(exist_ok=True). Leitura CSV: import csv; with open('dados.csv') as f: reader = csv.DictReader(f); [print(row) for row in reader].
+Datetime para timestamps: from datetime import datetime; agora = datetime.now(); iso = agora.isoformat(); ts = agora.timestamp(). time.time() retorna float UNIX timestamp. time.sleep(0.5) pausa 0.5 segundos. timedelta: amanha = datetime.now() + timedelta(days=1).
+Requests para HTTP em Python: import requests; resp = requests.get('https://api.openweathermap.org/data/2.5/weather', params={'q':'Brasilia','appid':KEY}); dados = resp.json(); resp.status_code. POST: requests.post(url, json={"temp":25.3}, headers={"Authorization":"Bearer TOKEN"}, timeout=5). Session para reutilizar conexões: s = requests.Session().
+paho-mqtt para MQTT em Python: import paho.mqtt.client as mqtt; client = mqtt.Client(); client.on_connect = lambda c,u,f,rc: client.subscribe('sensors/#'); client.on_message = lambda c,u,m: print(m.topic, m.payload.decode()); client.connect('broker.hivemq.com', 1883); client.loop_forever(). TLS: client.tls_set(ca_certs='ca.crt').
+SQLite3 embutido no Python: import sqlite3; conn = sqlite3.connect('sensores.db'); cur = conn.cursor(); cur.execute('CREATE TABLE IF NOT EXISTS leituras (ts REAL, temp REAL, umid REAL)'); cur.execute('INSERT INTO leituras VALUES (?,?,?)', (time.time(), temp, umid)); conn.commit(); rows = cur.execute('SELECT * FROM leituras ORDER BY ts DESC LIMIT 10').fetchall(); conn.close().
+Geradores são funções com yield que produzem valores sob demanda: def ler_continuo(sensor): while True: yield sensor.ler(); time.sleep(1). Economizam memória para streams de dados. itertools.islice(gerador, 100) pega os primeiros 100 valores. next(gen) avança manualmente.
+Decoradores modificam funções: @functools.cache memoiza resultados, @staticmethod remove necessidade de self, @property cria getters. Decorador personalizado: def retry(n): def decorator(f): def wrapper(*a,**k): for i in range(n): try: return f(*a,**k) except: if i==n-1: raise; return wrapper; return decorator.
+Context managers (with) garantem cleanup: class SensorContexto: def __enter__(self): self.iniciar(); return self; def __exit__(self,*a): self.finalizar(). contextlib.contextmanager: @contextmanager def sensor_aberto(pin): s = Sensor(pin); s.iniciar(); try: yield s; finally: s.fechar().
+Tipagem estática opcional (type hints) melhora manutenção e IDEs: def ler_temperatura(pino: int, tipo: str = 'DHT22') -> float: ... Verificação com mypy: mypy script.py. dataclasses reduzem boilerplate: @dataclass class Leitura: timestamp: float; temperatura: float; umidade: float. Python 3.10+: Union[int, str] = int | str.
+Virtual environments e boas práticas: sempre use venv para isolar dependências; use requirements.txt ou pyproject.toml (poetry/pip-tools); siga PEP 8 (4 espaços, linhas de 79 chars, nomes snake_case); docstrings para funções públicas; testes com pytest. Profiling: python -m cProfile meu_script.py.
+MicroPython file system: uos.listdir('/'); uos.mkdir('/data'); with open('/data/log.txt','a') as f: f.write(str(temp)). Flash disponível: uos.statvfs('/')[0]*uos.statvfs('/')[3] bytes livres. Para SD card: montar em /sd com uos.mount(). Modo REPL: conecte com tio ou minicom em 115200 baud.
+WebREPL no MicroPython permite acesso wireless: import webrepl; webrepl.start(password='senha123'). Acesse via browser em http://micropython.org/webrepl. Transferir arquivos: webrepl_cli.py -p senha arquivo.py 192.168.4.1:/arquivo.py.
+Exemplos práticos que combinam tudo: estação meteorológica com DHT22 + BMP280 + WiFi + MQTT; datalogger com DS18B20 + SD card + RTC; alarme com PIR + Buzzer + envio de e-mail via smtplib; monitoramento remoto com asyncio + WebSocket; robô seguidor de linha com PWM + sensores IR.
+A força de Python em hardware está na velocidade de prototipagem, na riqueza de bibliotecas e na capacidade de integrar facilmente com backends, bancos de dados e APIs de cloud. Para produção em sistemas críticos de tempo real, C/C++ ainda é superior — mas Python domina a camada de controle, análise e conectividade.`
+      },
+      {
+        title: "PYTHON CIÊNCIA DE DADOS E AUTOMAÇÃO",
+        text: `Ciência de dados com Python revolucionou a forma como analisamos e interpretamos informações de sensores IoT, sistemas embarcados e projetos de hardware. O ecossistema científico de Python — NumPy, Pandas, Matplotlib, SciPy, Scikit-learn — é o mais completo e ativo do mundo para análise de dados.
+NumPy (Numerical Python) é o fundamento de todo o ecossistema científico. Seu objeto central é o ndarray (N-dimensional array): import numpy as np; arr = np.array([1, 2, 3, 4, 5]). Diferente de listas Python, ndarrays são homogêneos (todos os elementos do mesmo tipo), armazenados em memória contígua, e operações são vetorizadas — executadas em C/Fortran internamente.
+Criação de arrays: np.zeros((3,4)) — matriz 3×4 de zeros. np.ones((2,3)) — uns. np.eye(4) — identidade 4×4. np.linspace(0, 2*np.pi, 100) — 100 pontos de 0 a 2π. np.arange(0, 10, 0.5) — de 0 a 9.5 com passo 0.5. np.random.rand(3,3) — uniforme [0,1). np.random.normal(25, 5, 1000) — normal com média 25 e desvio 5.
+Indexação e fatiamento de arrays: arr[0] primeiro elemento; arr[-1] último; arr[2:5] elementos 2,3,4; arr[::2] índices pares; matriz[1,3] elemento linha 1 coluna 3; matriz[0:2, 1:3] sub-matriz; arr[arr > 30] indexação booleana (filtrar temperaturas acima de 30°C).
+Operações vetorizadas: soma = a + b; produto = a * b (element-wise); dot_product = np.dot(a, b); np.sqrt(arr); np.exp(arr); np.log(arr); np.sin(arr). Broadcasting: arr + 10 adiciona 10 a cada elemento. Operações matriciais: np.linalg.inv(A); np.linalg.eig(A); np.linalg.solve(A, b).
+Funções estatísticas: np.mean(arr); np.median(arr); np.std(arr); np.var(arr); np.min/max(arr); np.percentile(arr, [25,50,75]); np.corrcoef(a, b) — correlação. Por eixo: np.mean(matriz, axis=0) — média de cada coluna; axis=1 — média de cada linha.
+Pandas é construído sobre NumPy e adiciona estruturas de dados rotuladas para análise de dados tabulares. DataFrame é a estrutura central: tabela com linhas e colunas nomeadas. import pandas as pd; df = pd.read_csv('sensores.csv'). df.head(10); df.tail(5); df.shape; df.dtypes; df.describe() — resumo estatístico.
+Criação de DataFrames: pd.DataFrame({'timestamp': datas, 'temp': temperaturas, 'umid': umidades}). pd.read_csv(), pd.read_excel(), pd.read_json(), pd.read_sql(query, conn). Exportar: df.to_csv('saida.csv', index=False); df.to_excel('relatorio.xlsx', sheet_name='Dados').
+Seleção e filtragem: df['temperatura'] — Series (coluna); df[['temp','umid']] — DataFrame com múltiplas colunas; df.loc[5, 'temperatura'] — por rótulo; df.iloc[0:10, 2:5] — por posição numérica; df[df['temperatura'] > 30] — filtragem booleana; df.query('temperatura > 30 and umidade < 60').
+Limpeza de dados: df.isnull().sum() — conta NaN por coluna; df.dropna() — remove linhas com NaN; df.fillna(df.mean()) — preenche NaN com a média; df.duplicated().sum() — conta duplicatas; df.drop_duplicates(). Detectar outliers: Q1=df.quantile(0.25); Q3=df.quantile(0.75); IQR=Q3-Q1; df[(df>=Q1-1.5*IQR)&(df<=Q3+1.5*IQR)].
+Transformações: df['temp_f'] = df['temperatura'] * 9/5 + 32 — nova coluna; df.rename(columns={'temp':'temperatura'}); df['hora'] = pd.to_datetime(df['timestamp']); df['hora'].dt.hour — extrai hora; df.set_index('hora'); df.sort_values('temperatura', ascending=False).
+GroupBy para agregação: grupo = df.groupby('dispositivo'); grupo['temperatura'].mean() — média por dispositivo; grupo.agg({'temp':['mean','max','min'], 'umid':'mean'}). resample() para séries temporais: df.resample('1H').mean() — média a cada hora; df.resample('D').agg({'temp':'max','umid':'min'}).
+Merge e join de DataFrames: pd.merge(df1, df2, on='device_id') — inner join; pd.merge(df1, df2, how='left') — left join; df1.join(df2) — join por índice. pd.concat([df1, df2]) — empilhar DataFrames verticalmente.
+Matplotlib para visualização: import matplotlib.pyplot as plt. plt.plot(x, y, 'b-', linewidth=2, label='Temperatura'); plt.scatter(x, y, c=cores, s=tamanhos); plt.bar(categorias, valores); plt.hist(dados, bins=50, density=True); plt.figure(figsize=(12,6)); plt.xlabel('Tempo'); plt.ylabel('Temperatura (°C)'); plt.title('Monitoramento'); plt.legend(); plt.grid(True, alpha=0.3); plt.savefig('grafico.png', dpi=150, bbox_inches='tight'); plt.show().
+Subplots: fig, axes = plt.subplots(2, 2, figsize=(14, 10)); axes[0,0].plot(t, temp); axes[0,1].scatter(umid, temp); axes[1,0].hist(temp, bins=30); axes[1,1].boxplot(dados_por_sensor). plt.tight_layout() evita sobreposição.
+Plotly para gráficos interativos: import plotly.express as px; fig = px.line(df, x='timestamp', y='temperatura', color='dispositivo', title='Temperatura por dispositivo'); fig.update_layout(template='plotly_dark'); fig.show(). px.scatter_mapbox para mapas com dispositivos IoT geolocalizados.
+SciPy para análise científica: from scipy import signal, stats, optimize. Filtros digitais: b, a = signal.butter(4, 0.1, btype='low'); filtrado = signal.filtfilt(b, a, dados_ruidosos). FFT: freq = np.fft.fftfreq(N, d=1/fs); espectro = np.abs(np.fft.fft(sinal)). stats.ttest_ind(grupo_a, grupo_b) — t-test para comparar médias. optimize.curve_fit(modelo, x, y) — ajuste de curvas.
+Scikit-learn para machine learning clássico: from sklearn.preprocessing import StandardScaler; from sklearn.model_selection import train_test_split; from sklearn.ensemble import RandomForestClassifier; from sklearn.metrics import accuracy_score, confusion_matrix.
+Pipeline típico ML: X, y = df[features], df['label']; X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42); scaler = StandardScaler(); X_train_scaled = scaler.fit_transform(X_train); X_test_scaled = scaler.transform(X_test); modelo = RandomForestClassifier(n_estimators=100); modelo.fit(X_train_scaled, y_train); acc = accuracy_score(y_test, modelo.predict(X_test_scaled)).
+Regressão linear: from sklearn.linear_model import LinearRegression; reg = LinearRegression(); reg.fit(X_train, y_train); print(reg.coef_, reg.intercept_); y_pred = reg.predict(X_test); from sklearn.metrics import mean_squared_error, r2_score; rmse = np.sqrt(mean_squared_error(y_test, y_pred)); r2 = r2_score(y_test, y_pred).
+Clustering para análise de dados de sensores: from sklearn.cluster import KMeans; km = KMeans(n_clusters=3, random_state=42); km.fit(X); labels = km.labels_; centroids = km.cluster_centers_. Visualizar: plt.scatter(X[:,0], X[:,1], c=labels, cmap='viridis'). DBSCAN para clusters de forma irregular: from sklearn.cluster import DBSCAN.
+Detecção de anomalias em séries temporais de IoT: from sklearn.ensemble import IsolationForest; iso = IsolationForest(contamination=0.05); iso.fit(X); predicoes = iso.predict(X); anomalias = X[predicoes == -1]. Alternativa: z-score = (x - mean) / std; outlier se |z| > 3.
+Web scraping com requests e BeautifulSoup: import requests; from bs4 import BeautifulSoup; resp = requests.get('https://exemplo.com', headers={'User-Agent':'Mozilla/5.0'}); soup = BeautifulSoup(resp.text, 'html.parser'); tabela = soup.find('table', class_='dados'); linhas = tabela.find_all('tr'); dados = [td.text.strip() for td in linhas[0].find_all('td')].
+Selenium para scraping com JavaScript: from selenium import webdriver; from selenium.webdriver.common.by import By; driver = webdriver.Chrome(); driver.get('https://site.com'); elemento = driver.find_element(By.ID, 'btn-exportar'); elemento.click(); time.sleep(2); dados = driver.find_element(By.CLASS_NAME, 'tabela-dados').text; driver.quit().
+Automação com Python: os e shutil para operações de arquivo: import os, shutil; os.makedirs('backups/2024', exist_ok=True); shutil.copy2('dados.csv', 'backups/2024/dados_backup.csv'); os.rename(arquivo_velho, arquivo_novo); glob.glob('logs/*.log') — padrão de arquivos.
+subprocess para executar comandos do sistema: import subprocess; resultado = subprocess.run(['ping', '-c', '4', '192.168.1.1'], capture_output=True, text=True); print(resultado.stdout). Para streaming: proc = subprocess.Popen(['tail', '-f', '/var/log/sensor.log'], stdout=subprocess.PIPE, text=True). Automação de SSH com paramiko: import paramiko; ssh.connect('192.168.1.50', username='pi', password='raspberry').
+Expressões regulares para parsing de logs de hardware: import re; padrao = r'TEMP:\s*([\d.]+)\s*C\s*UMID:\s*([\d.]+)%'; match = re.search(padrao, linha_log); temp, umid = float(match.group(1)), float(match.group(2)). re.findall() encontra todas as ocorrências. re.sub() faz substituição.
+Agendamento de tarefas: schedule library: import schedule; schedule.every(30).seconds.do(ler_sensores); schedule.every().hour.do(enviar_relatorio); schedule.every().day.at('08:00').do(fazer_backup); while True: schedule.run_pending(); time.sleep(1). Para produção, use crontab (Linux) ou Task Scheduler (Windows).
+Excel e PDF com Python: openpyxl para Excel: import openpyxl; wb = openpyxl.Workbook(); ws = wb.active; ws.append(['Timestamp', 'Temp', 'Umid']); ws.append([datetime.now().isoformat(), 25.3, 65.1]); wb.save('relatorio.xlsx'). xlsxwriter para formatação avançada: chart = workbook.add_chart({'type':'line'}). reportlab ou fpdf2 para PDF.
+Pillow para processamento de imagens: from PIL import Image, ImageDraw, ImageFont; img = Image.open('captura.jpg'); img_redim = img.resize((640, 480)); img_cinza = img.convert('L'); pixels = np.array(img_cinza); hist = np.histogram(pixels, bins=256). Para câmera do RPi: from picamera2 import Picamera2; cam = Picamera2(); cam.start(); frame = cam.capture_array().
+FastAPI para criar APIs REST para dados de IoT: from fastapi import FastAPI; app = FastAPI(); @app.get('/api/temperatura/{dispositivo}') async def get_temp(dispositivo: str): dados = db.query(dispositivo); return {'dispositivo': dispositivo, 'temperatura': dados.temp}. uvicorn main:app --host 0.0.0.0 --port 8080. Swagger UI automático em /docs.
+SQLAlchemy para ORM: from sqlalchemy import create_engine, Column, Float, String; from sqlalchemy.orm import declarative_base, Session. Base = declarative_base(); class Leitura(Base): __tablename__ = 'leituras'; id = Column(Integer, primary_key=True); temperatura = Column(Float). engine = create_engine('sqlite:///iot.db'); Base.metadata.create_all(engine).
+Análise de séries temporais com statsmodels: from statsmodels.tsa.seasonal import seasonal_decompose; resultado = seasonal_decompose(df['temperatura'], model='additive', period=24); resultado.trend.plot(); resultado.seasonal.plot(); resultado.resid.plot(). ARIMA para previsão: from statsmodels.tsa.arima.model import ARIMA; modelo = ARIMA(serie, order=(1,1,1)); ajuste = modelo.fit(); previsao = ajuste.forecast(steps=24).
+Integração com InfluxDB: from influxdb_client import InfluxDBClient, Point; from influxdb_client.client.write_api import SYNCHRONOUS; client = InfluxDBClient(url='http://localhost:8086', token=TOKEN, org=ORG); write_api = client.write_api(write_options=SYNCHRONOUS); p = Point('temperatura').tag('device','esp32').field('value', 25.3); write_api.write(bucket='iot', record=p). Consulta: query = 'from(bucket:"iot") |> range(start:-1h)'; df = client.query_api().query_data_frame(query=query).
+Jupyter Notebook é o ambiente interativo ideal para exploração de dados de IoT: %matplotlib inline para gráficos inline; %time para medir tempo de célula; %%timeit para benchmark. Widgets interativos: import ipywidgets as widgets; slider = widgets.IntSlider(min=0, max=100, step=1, value=50); @widgets.interact(threshold=slider): def filtrar(threshold): display(df[df['temp']>threshold]).
+Boas práticas de ciência de dados: separar exploração (Notebook) de produção (scripts .py); versionar modelos com MLflow ou DVC; documentar experimentos; validação cruzada (cross_val_score) em vez de train/test simples; pipeline sklearn para evitar data leakage; feature engineering antes de modelagem; interpretabilidade com SHAP values.
+A automação com Python é transformadora em projetos de IoT: coleta automática de dados de sensores, geração de relatórios, envio de alertas por e-mail (smtplib) ou Telegram (python-telegram-bot), upload para Google Sheets (gspread), backup automatizado, limpeza de logs antigos. Python transforma projetos de hardware em sistemas inteligentes e autônomos.`
+      },
+      {
+        title: "PYTHON IA E MACHINE LEARNING EMBARCADO",
+        text: `Inteligência Artificial e Machine Learning embarcado representam a fronteira mais avançada da integração entre Python e hardware. A capacidade de executar modelos de IA diretamente em microcontroladores e computadores de placa única sem conexão com nuvem abre possibilidades revolucionárias para IoT, robótica e automação.
+TensorFlow e Keras são o framework mais popular para deep learning em Python. import tensorflow as tf; from tensorflow import keras. TF 2.x usa eager execution por padrão (execução imediata, como PyTorch). Keras é a API de alto nível integrada ao TF 2.
+Criação de modelo com Keras Sequential API: model = keras.Sequential([keras.layers.Dense(64, activation='relu', input_shape=(10,)), keras.layers.Dropout(0.3), keras.layers.Dense(32, activation='relu'), keras.layers.Dense(1, activation='sigmoid')]). Para classificação multi-classe: activation='softmax' na última camada.
+Compilação e treinamento: model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']). history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_split=0.2, callbacks=[keras.callbacks.EarlyStopping(patience=5, restore_best_weights=True)]). EarlyStopping evita overfitting ao parar quando val_loss para de melhorar.
+Redes Neurais Convolucionais (CNN) para visão computacional embarcada: model = keras.Sequential([keras.layers.Conv2D(32,(3,3),activation='relu',input_shape=(64,64,3)), keras.layers.MaxPooling2D(2,2), keras.layers.Conv2D(64,(3,3),activation='relu'), keras.layers.MaxPooling2D(2,2), keras.layers.Flatten(), keras.layers.Dense(128,activation='relu'), keras.layers.Dense(num_classes,activation='softmax')]).
+Arquiteturas pré-treinadas para transfer learning: base = keras.applications.MobileNetV2(input_shape=(96,96,3), include_top=False, weights='imagenet'); base.trainable = False; model = keras.Sequential([base, keras.layers.GlobalAveragePooling2D(), keras.layers.Dense(num_classes,activation='softmax')]). MobileNetV2 é compacto e eficiente para edge.
+Data augmentation para aumentar dataset de imagens: datagen = keras.preprocessing.image.ImageDataGenerator(rotation_range=20, width_shift_range=0.2, height_shift_range=0.2, shear_range=0.2, zoom_range=0.2, horizontal_flip=True). train_generator = datagen.flow_from_directory('dataset/train', target_size=(96,96), batch_size=32).
+Avaliação de modelos: test_loss, test_acc = model.evaluate(X_test, y_test); y_pred = model.predict(X_test); from sklearn.metrics import classification_report, confusion_matrix; print(classification_report(y_true, np.argmax(y_pred, axis=1))). Matriz de confusão: cm = confusion_matrix(y_true, y_pred_classes); sns.heatmap(cm, annot=True).
+Curvas de aprendizado: plt.plot(history.history['loss'], label='Train Loss'); plt.plot(history.history['val_loss'], label='Val Loss'); plt.plot(history.history['accuracy'], label='Train Acc'). Overfitting: train loss cai, val loss sobe. Underfitting: ambas altas. Learning rate scheduling: keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3).
+TensorFlow Lite (TFLite) converte modelos Keras/TF para formato compacto binário (.tflite) para edge deployment. Conversão: converter = tf.lite.TFLiteConverter.from_keras_model(model); tflite_model = converter.convert(); with open('model.tflite','wb') as f: f.write(tflite_model). Tamanho típico: MobileNetV1 = 4 MB, MobileNetV2 = 3.4 MB, personalizados <500 KB.
+Quantização para reduzir modelo: INT8 post-training quantization: converter.optimizations = [tf.lite.Optimize.DEFAULT]; converter.representative_dataset = lambda: ({'input': [x]} for x in X_calibracao); converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]; converter.inference_input_type = tf.int8; converter.inference_output_type = tf.int8. Redução de 4x no tamanho e 2-4x na velocidade de inferência.
+Inferência TFLite em Python (dispositivo edge/RPi): interpreter = tf.lite.Interpreter(model_path='model.tflite'); interpreter.allocate_tensors(); input_details = interpreter.get_input_details(); output_details = interpreter.get_output_details(); input_data = np.expand_dims(imagem_preprocessada, axis=0).astype(np.float32); interpreter.set_tensor(input_details[0]['index'], input_data); interpreter.invoke(); output = interpreter.get_tensor(output_details[0]['index']).
+TFLite Micro para MCUs (ESP32, Cortex-M): não é Python puro, mas o modelo .tflite gerado em Python é deployed em C++. Fluxo: treinar em Python/TF → converter para .tflite → quantizar → converter para array C com xxd -i model.tflite > model_data.cc → incluir no projeto C++/Arduino com TFLite Micro library. Arena de 100-300 KB é típica.
+PyTorch é o framework preferido para pesquisa e cada vez mais para produção. import torch; import torch.nn as nn. Tensores: t = torch.tensor([[1.0, 2.0], [3.0, 4.0]]); t.shape; t.dtype; t.to('cuda') para GPU. Operações: torch.matmul(A, B); torch.sigmoid(x); F.relu(x); nn.Conv2d(in_ch, out_ch, kernel_size).
+Modelo PyTorch: class MeuModelo(nn.Module): def __init__(self): super().__init__(); self.conv1 = nn.Conv2d(1,32,3); self.pool = nn.MaxPool2d(2); self.fc1 = nn.Linear(32*13*13,128); self.fc2 = nn.Linear(128,10). def forward(self,x): x=F.relu(self.conv1(x)); x=self.pool(x); x=x.view(-1,32*13*13); return self.fc2(F.relu(self.fc1(x))).
+Training loop PyTorch: optimizer = torch.optim.Adam(model.parameters(), lr=0.001); criterion = nn.CrossEntropyLoss(). for epoch in range(epochs): for batch_x, batch_y in train_loader: optimizer.zero_grad(); outputs = model(batch_x); loss = criterion(outputs, batch_y); loss.backward(); optimizer.step(). torch.save(model.state_dict(), 'model.pt').
+Exportar PyTorch para ONNX: dummy_input = torch.randn(1, 3, 224, 224); torch.onnx.export(model, dummy_input, 'model.onnx', input_names=['input'], output_names=['output'], dynamic_axes={'input':{0:'batch_size'}, 'output':{0:'batch_size'}}). ONNX model pode ser otimizado para edge com ONNX Runtime ou convertido para TFLite.
+ONNX Runtime para inferência eficiente: import onnxruntime as ort; session = ort.InferenceSession('model.onnx', providers=['CUDAExecutionProvider','CPUExecutionProvider']); input_name = session.get_inputs()[0].name; output = session.run(None, {input_name: input_data}). Suporte nativo a ARM (Raspberry Pi, Jetson).
+OpenCV para visão computacional: import cv2. Captura de câmera: cap = cv2.VideoCapture(0); ret, frame = cap.read(); cap.release(). Operações: gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY); blurred = cv2.GaussianBlur(gray, (5,5), 0); edges = cv2.Canny(blurred, 100, 200); contornos, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE).
+Detecção de faces com OpenCV Haar Cascades: face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'); faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30,30)); for (x,y,w,h) in faces: cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2).
+Detecção de objetos com YOLOv8 (ultralytics): from ultralytics import YOLO; model = YOLO('yolov8n.pt'); results = model('imagem.jpg'); results[0].boxes.xyxy; results[0].boxes.conf; results[0].boxes.cls. YOLOv8n (nano) cabe em ARM com boa performance. yolov8n.tflite para TFLite Micro.
+MobileNet SSD para detecção em tempo real no RPi: baixar tflite model do TF Hub; preprocessar: img = cv2.resize(frame,(300,300)); inp = np.expand_dims(img,0).astype(np.uint8); interpreter.set_tensor(input_id, inp); interpreter.invoke(); scores = interpreter.get_tensor(scores_id)[0]; boxes = interpreter.get_tensor(boxes_id)[0]; classe_detectada = classes[np.argmax(scores)].
+Segmentação semântica com DeepLab: útil para robótica (detectar chão, objetos). Mais pesado que detecção; Lite versões disponíveis. Para contagem de plantas em agricultura de precisão: segmenta vegetação (verde) vs solo. Alternativa leve: classificador de patches de imagem com CNN pequena customizada.
+Reconhecimento de gestos e poses: MediaPipe (Google) tem soluções pré-treinadas: pip install mediapipe; import mediapipe as mp; hands = mp.solutions.hands.Hands(); results = hands.process(rgb_frame); if results.multi_hand_landmarks: pontos = results.multi_hand_landmarks[0].landmark; dedo_indicador = pontos[8]. Leve o suficiente para RPi 4.
+Edge Impulse é uma plataforma no-code/low-code para ML embarcado: coleta dados via Serial/BLE/WiFi diretamente do dispositivo (Arduino, ESP32, RPi); realiza feature extraction (MFCC para áudio, espectrograma, acelerômetro); treina CNN ou Decision Tree na nuvem; exporta modelo como biblioteca Arduino, C++, Python ou TFLite. SDK Python para automação.
+Inferência de detecção de anomalias em sinais de sensores: sequências temporais de vibração (MPU6050) → CNN-LSTM → anomalia = componente com defeito. Processo: coletar dados normais → treinar autoencoder → threshold no erro de reconstrução → produção: se erro > threshold, alerta de anomalia. Funciona offline no gateway.
+Aceleração de inferência: ONNX Runtime com extensões ARM: pip install ort-nightly-arm; habilita NEON instructions. TFLite com XNNPACK delegate: interpreter = tf.lite.Interpreter(model_path='m.tflite', experimental_delegates=[tf.lite.experimental.load_delegate('libXNNPACK.dylib')]). Coral USB Accelerator (Edge TPU): inferência 100x mais rápida no RPi via USB.
+Reconhecimento de voz (Keyword Spotting) embarcado: modelo wake word (Hey Alexa, OK Google) roda localmente. Python: speechbrain, porcupine (Picovoice). No MCU: tflite model de keyword spotting com MFCC features do microfone. Processo: buffer de 1s de áudio → FFT → MFCC (13-40 coeficientes) → CNN-1D → score do keyword.
+Análise de qualidade de ar com ML: CO2, VOC, temperatura, umidade → regressão para prever índice de qualidade. Feature engineering: razão CO2/VOC, hora do dia, histórico de 10 min. Modelo leve: Random Forest (sklearn) exportado com joblib: modelo = joblib.load('qualidade_ar.pkl'); predicao = modelo.predict([[co2, voc, temp, umid, hora]]).
+Transfer learning para casos de uso customizados: começar com MobileNetV2 pré-treinado no ImageNet (reconhece 1000 classes gerais) → substituir última camada por Dense(num_minhas_classes) → fine-tune somente as últimas N camadas → treinar com dataset pequeno (100-500 imagens por classe é suficiente). Acurácia de 90%+ com dataset limitado.
+Data augmentation avançada para datasets de IoT pequenos: from tensorflow.keras.layers import RandomFlip, RandomRotation, RandomZoom, RandomContrast; augmentation = keras.Sequential([RandomFlip('horizontal'), RandomRotation(0.2), RandomZoom(0.2), RandomContrast(0.1)]). Mix-up augmentation: combina pares de imagens com seus labels para regularização.
+Quantization-aware training para melhor acurácia em INT8: import tensorflow_model_optimization as tfmot; qat_model = tfmot.quantization.keras.quantize_model(model); qat_model.compile(...); qat_model.fit(X_train, y_train, epochs=10); converter = tf.lite.TFLiteConverter.from_keras_model(qat_model); converter.optimizations = [tf.lite.Optimize.DEFAULT]; tflite_qat_model = converter.convert(). Melhor acurácia que post-training quantization.
+MLflow para rastreamento de experimentos: import mlflow; with mlflow.start_run(): mlflow.log_param('learning_rate', 0.001); mlflow.log_param('epochs', 50); mlflow.log_metric('test_accuracy', 0.94); mlflow.tensorflow.log_model(model, 'model'). mlflow ui inicia dashboard web para comparar experimentos.
+Federated Learning para IoT com privacidade: dispositivos treinam modelos localmente com dados privados → enviam apenas gradientes (não dados) ao servidor → servidor agrega → modelo global melhorado retorna aos devices. TensorFlow Federated (TFF) e PySyft implementam FL em Python. Preserva privacidade: dados de saúde nunca saem do dispositivo.
+Otimização de hiperparâmetros com Optuna: import optuna; def objective(trial): lr=trial.suggest_float('lr',1e-5,1e-1,log=True); n_units=trial.suggest_int('n_units',32,256); ... model = criar_modelo(lr,n_units); ... return val_acc. study=optuna.create_study(direction='maximize'); study.optimize(objective,n_trials=100). Mais eficiente que grid search.
+Deployment em produção com ONNX Runtime Server ou TF Serving: docker pull tensorflow/serving; docker run -p 8501:8501 -v /models:/models tensorflow/serving --model_base_path=/models/meu_modelo --model_name=sensor_classifier. requests.post('http://localhost:8501/v1/models/sensor_classifier:predict', json={'instances': X_novo.tolist()}).
+O futuro do ML embarcado aponta para modelos cada vez menores e mais eficientes: arquiteturas Neural Architecture Search (NAS) como EfficientNet-Lite, MNASNet, MCUNet; quantização de 4 bits; pruning (poda de neurônios inativos) com 80% de sparsidade sem perda de acurácia. A Arm introduziu ethos-U55 (NPU embarcada em Cortex-M55) para inferência local em microcontroladores. Python continuará sendo a linguagem primária para treinamento, análise e pipeline de dados — mesmo que a inferência final rode em C++ no hardware.`
+      }
     ]
   };
 
@@ -1657,20 +2330,26 @@ Parabéns por completar a trilha de elite do DEVGENIUS.`
       <div className="px-12 py-10 bg-neutral-950/50 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
            <h3 className="text-2xl font-black text-white uppercase tracking-tighter">BASE DE CONHECIMENTO V12</h3>
-           <p className="text-[10px] text-cyan-500 font-bold uppercase tracking-[0.3em]">C++ & JavaScript Core Training</p>
+           <p className="text-[10px] text-cyan-500 font-bold uppercase tracking-[0.3em]">C++ & JavaScript & Python Core Training</p>
         </div>
         <div className="flex bg-neutral-900 p-1.5 rounded-2xl border border-white/5 gap-2">
-           <button 
+           <button
              onClick={() => { setActiveLang("cpp"); setActivePart(0); }}
              className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeLang === "cpp" ? "bg-white text-black" : "text-neutral-500 hover:text-white"}`}
            >
-             C++ PARA HARDWARE
+             C++ HARDWARE
            </button>
-           <button 
+           <button
              onClick={() => { setActiveLang("js"); setActivePart(0); }}
              className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeLang === "js" ? "bg-white text-black" : "text-neutral-500 hover:text-white"}`}
            >
-             JAVASCRIPT IOT
+             JAVASCRIPT IoT
+           </button>
+           <button
+             onClick={() => { setActiveLang("py"); setActivePart(0); }}
+             className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeLang === "py" ? "bg-amber-500 text-neutral-950" : "text-neutral-500 hover:text-white"}`}
+           >
+             🐍 PYTHON
            </button>
         </div>
       </div>
@@ -1759,16 +2438,36 @@ function ProvasView({ progress, onComplete }: {
   onComplete: (trilha: Trilha, score: number, total: number) => void
 }) {
   const [activeTrilha, setActiveTrilha] = useState<Trilha | null>(null);
+  const [activeModulo, setActiveModulo] = useState<Modulo>("basico");
 
-  const trilhas: { id: Trilha; icon: any }[] = [
-    { id: "eletronica", icon: Layers },
-    { id: "arduino", icon: Cpu },
-    { id: "sensores", icon: Activity },
-  ];
+  const moduloIcons: Record<Modulo, any> = {
+    basico: Layers,
+    intermediario: Zap,
+    pro: Trophy,
+  };
 
-  const totalQuestions = trilhas.reduce((acc, t) => acc + QUESTIONS[t.id].length, 0);
-  const totalBest = trilhas.reduce((acc, t) => acc + (progress[t.id].best || 0), 0);
-  const overallPercent = (totalBest / totalQuestions) * 100;
+  const moduloColors: Record<Modulo, string> = {
+    basico:        "cyan",
+    intermediario: "amber",
+    pro:           "red",
+  };
+
+  const trilhaIcons: Record<Trilha, any> = {
+    eletronica:    Zap,
+    arduino:       Cpu,
+    sensores:      Activity,
+    eletro_inter:  Zap,
+    arduino_inter: Code,
+    redes_inter:   MessageSquare,
+    eletro_pro:    Sparkles,
+    firmware_pro:  Terminal,
+    iot_pro:       Box,
+  };
+
+  const currentTrilhas = MODULO_INFO[activeModulo].trilhas;
+  const totalQ = currentTrilhas.reduce((a, t) => a + QUESTIONS[t].length, 0);
+  const totalBest = currentTrilhas.reduce((a, t) => a + (progress[t]?.best || 0), 0);
+  const overallPct = totalQ > 0 ? (totalBest / totalQ) * 100 : 0;
 
   if (activeTrilha) {
     return (
@@ -1784,67 +2483,123 @@ function ProvasView({ progress, onComplete }: {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-12">
-      <div className="text-center space-y-8">
-        <div className="space-y-4">
-          <h2 className="text-5xl font-black tracking-tighter uppercase">CENTRO DE <span className="text-cyan-400">CERTIFICAÇÃO</span></h2>
-          <p className="text-neutral-500 font-medium max-w-xl mx-auto">Três trilhas com questões reais sobre eletrônica, Arduino e sensores. Cada questão mostra a explicação após a resposta.</p>
-        </div>
+    <div className="max-w-6xl mx-auto space-y-10 pb-20">
+      {/* Header */}
+      <div className="text-center space-y-4">
+        <h2 className="text-5xl font-black tracking-tighter uppercase">CENTRO DE <span className="text-cyan-400">CERTIFICAÇÃO</span></h2>
+        <p className="text-neutral-500 font-medium max-w-2xl mx-auto">3 módulos de dificuldade crescente, cada um com 3 trilhas de 30 questões. Cada questão exibe a explicação após responder.</p>
+      </div>
 
-        <div className="max-w-md mx-auto">
-           <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-3">
-              <span>Sua performance geral</span>
-              <span>{totalBest} / {totalQuestions}</span>
-           </div>
-           <div className="h-3 bg-neutral-900 rounded-full border border-white/5 overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${overallPercent}%` }}
-                className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 shadow-[0_0_15px_#06b6d4]"
-              />
-           </div>
+      {/* Módulo selector */}
+      <div className="flex justify-center">
+        <div className="bg-neutral-900 border border-white/5 p-1.5 rounded-[2rem] flex gap-2">
+          {(["basico", "intermediario", "pro"] as Modulo[]).map(m => {
+            const MIcon = moduloIcons[m];
+            const isActive = activeModulo === m;
+            const colorMap: Record<Modulo, string> = {
+              basico: isActive ? "bg-cyan-500 text-neutral-950" : "text-neutral-500 hover:text-cyan-400",
+              intermediario: isActive ? "bg-amber-500 text-neutral-950" : "text-neutral-500 hover:text-amber-400",
+              pro: isActive ? "bg-red-500 text-neutral-950" : "text-neutral-500 hover:text-red-400",
+            };
+            return (
+              <button
+                key={m}
+                onClick={() => setActiveModulo(m)}
+                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${colorMap[m]} ${isActive ? "shadow-xl scale-105" : ""}`}
+              >
+                <MIcon className="w-3.5 h-3.5" />
+                {m === "basico" ? "Módulo 1 — Básico" : m === "intermediario" ? "Módulo 2 — Intermediário" : "Módulo 3 — Pro"}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {trilhas.map((t) => {
-          const info = TRILHA_INFO[t.id];
-          const tProgress = progress[t.id];
-          const size = QUESTIONS[t.id].length;
-          const isDone = tProgress.completed;
-          const userScore = tProgress.best;
+      {/* Barra de progresso do módulo */}
+      <div className="max-w-md mx-auto">
+        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-3">
+          <span>Performance — {MODULO_INFO[activeModulo].label}</span>
+          <span>{totalBest} / {totalQ}</span>
+        </div>
+        <div className="h-3 bg-neutral-900 rounded-full border border-white/5 overflow-hidden">
+          <motion.div
+            key={activeModulo}
+            initial={{ width: 0 }}
+            animate={{ width: `${overallPct}%` }}
+            className={`h-full shadow-[0_0_15px] ${
+              activeModulo === "basico" ? "bg-gradient-to-r from-cyan-600 to-cyan-400 shadow-cyan-500/40" :
+              activeModulo === "intermediario" ? "bg-gradient-to-r from-amber-600 to-amber-400 shadow-amber-500/40" :
+              "bg-gradient-to-r from-red-600 to-red-400 shadow-red-500/40"
+            }`}
+          />
+        </div>
+      </div>
 
+      {/* Trilha cards */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeModulo}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        >
+          {currentTrilhas.map(trilha => {
+            const info = TRILHA_INFO[trilha];
+            const prog = progress[trilha] ?? { best: null, completed: false };
+            const size = QUESTIONS[trilha].length;
+            const isDone = prog.completed;
+            const TIcon = trilhaIcons[trilha];
+
+            const accentClass: Record<Modulo, string> = {
+              basico: isDone ? "border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40" : "border-white/10 bg-neutral-900 hover:border-cyan-500/50 hover:bg-neutral-800",
+              intermediario: isDone ? "border-emerald-500/20 bg-emerald-500/5" : "border-white/10 bg-neutral-900 hover:border-amber-500/50 hover:bg-neutral-800",
+              pro: isDone ? "border-emerald-500/20 bg-emerald-500/5" : "border-white/10 bg-neutral-900 hover:border-red-500/50 hover:bg-neutral-800",
+            };
+            const iconClass: Record<Modulo, string> = {
+              basico: isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform",
+              intermediario: isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform",
+              pro: isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/10 text-red-400 group-hover:scale-110 transition-transform",
+            };
+
+            return (
+              <button
+                key={trilha}
+                onClick={() => setActiveTrilha(trilha)}
+                className={`text-left p-8 rounded-[2.5rem] border transition-all relative overflow-hidden group ${accentClass[activeModulo]}`}
+              >
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${iconClass[activeModulo]}`}>
+                  {isDone ? <CheckCircle2 /> : <TIcon />}
+                </div>
+                <h4 className={`text-xl font-black uppercase tracking-tighter mb-2 ${isDone ? "text-emerald-400" : "text-white"}`}>
+                  {info.label}
+                </h4>
+                <p className="text-neutral-500 text-xs font-medium leading-relaxed">{info.desc}</p>
+                <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
+                  <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest">{size} questões</span>
+                  {prog.best !== null && (
+                    <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${isDone ? "text-emerald-500" : activeModulo === "basico" ? "text-cyan-400" : activeModulo === "intermediario" ? "text-amber-400" : "text-red-400"}`}>
+                      {isDone ? <Trophy className="w-3 h-3" /> : null}
+                      Melhor: {prog.best}/{size}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Legend */}
+      <div className="flex flex-wrap justify-center gap-6 pt-4 border-t border-white/5">
+        {(["basico","intermediario","pro"] as Modulo[]).map(m => {
+          const done = MODULO_INFO[m].trilhas.filter(t => progress[t]?.completed).length;
+          const total = MODULO_INFO[m].trilhas.length;
           return (
-            <button
-              key={t.id}
-              onClick={() => setActiveTrilha(t.id)}
-              className={`text-left p-8 rounded-[2.5rem] border transition-all relative overflow-hidden group ${
-                isDone
-                ? "bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40"
-                : "bg-neutral-900 border-white/10 hover:border-cyan-500/50 hover:bg-neutral-800"
-              }`}
-            >
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${
-                isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform"
-              }`}>
-                {isDone ? <CheckCircle2 /> : <t.icon />}
-              </div>
-
-              <h4 className={`text-xl font-black uppercase tracking-tighter mb-2 ${isDone ? "text-emerald-400" : "text-white"}`}>
-                {info.label}
-              </h4>
-              <p className="text-neutral-500 text-xs font-medium leading-relaxed">{info.desc}</p>
-
-              <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
-                 <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest">{size} questões</span>
-                 {userScore !== null && (
-                   <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${isDone ? "text-emerald-500" : "text-cyan-400"}`}>
-                     {isDone ? <Trophy className="w-3 h-3" /> : null}
-                     Melhor: {userScore} / {size}
-                   </span>
-                 )}
-              </div>
-            </button>
+            <div key={m} className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-neutral-600">
+              <div className={`w-2 h-2 rounded-full ${m === "basico" ? "bg-cyan-500" : m === "intermediario" ? "bg-amber-500" : "bg-red-500"}`} />
+              {MODULO_INFO[m].label}: {done}/{total} trilhas completas
+            </div>
           );
         })}
       </div>

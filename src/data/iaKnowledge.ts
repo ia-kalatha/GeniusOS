@@ -494,7 +494,7 @@ for (int i = 0; i < 5; i++) {
 Serial.println(soma); // 150
 \`\`\`
 
-> Arduino não verifica limites de array! Acessar `numeros[5]` é undefined behavior — causa bugs difíceis de encontrar.`
+> Arduino não verifica limites de array! Acessar \`numeros[5]\` é undefined behavior — causa bugs difíceis de encontrar.`
   },
   {
     q: "como declarar variavel global constante define const arduino",
@@ -513,7 +513,7 @@ const int LED_PIN = 13;    // boa prática: nome em maiúsculas
 \`\`\`
 
 **Diferença const vs #define:**
-| | `const int` | `#define` |
+| | \`const int\` | \`#define\` |
 |--|--|--|
 | Tipo | Sim | Não |
 | Debug | Aparece no depurador | Não |
@@ -2205,7 +2205,7 @@ void setup() {
 }
 \`\`\`
 
-**Regra prática:** use `F()` em todo `Serial.print()` para economizar SRAM:
+**Regra prática:** use \`F()\` em todo \`Serial.print()\` para economizar SRAM:
 \`\`\`cpp
 Serial.println(F("Inicializando sensor DHT22..."));
 \`\`\``
@@ -2718,3 +2718,204 @@ export function buscarResposta(perguntaUsuario: string): string | null {
   // Limiar: pelo menos 20% de sobreposição de palavras-chave
   return melhorScore >= 0.20 ? melhorResposta : null;
 }
+
+// ─── CATEGORIAS GUIADAS ─────────────────────────────────────────────────────
+
+export interface GuidedQuestion {
+  label: string;   // rótulo curto para o chip da UI
+  question: string;// texto completo enviado ao chat
+}
+
+export interface GuidedCategory {
+  id: string;
+  label: string;
+  emoji: string;
+  desc: string;
+  questions: GuidedQuestion[];
+}
+
+export const IA_GUIDED_CATEGORIES: GuidedCategory[] = [
+  {
+    id: "arduino",
+    label: "Arduino",
+    emoji: "🤖",
+    desc: "Básico, pinos, serial, PWM",
+    questions: [
+      { label: "Ligar LED",         question: "Como ligar um LED no Arduino?" },
+      { label: "Usar botão",        question: "Como usar botão no Arduino?" },
+      { label: "Leitura analógica", question: "Como ler sensor analógico com analogRead?" },
+      { label: "Controle PWM",      question: "Como usar PWM com analogWrite no Arduino?" },
+      { label: "Monitor Serial",    question: "Como usar o Monitor Serial no Arduino?" },
+      { label: "setup() vs loop()", question: "Qual a diferença entre setup e loop no Arduino?" },
+      { label: "delay() vs millis()",question: "Qual a diferença entre delay e millis no Arduino?" },
+      { label: "Interrupções",      question: "Como usar interrupções com attachInterrupt no Arduino?" },
+      { label: "EEPROM",            question: "Como usar EEPROM no Arduino para salvar dados?" },
+      { label: "Servo Motor",       question: "Como usar servo motor com a biblioteca Servo no Arduino?" },
+      { label: "Configurar pinos",  question: "Como configurar pino como entrada ou saída no Arduino?" },
+      { label: "Temperatura DHT22", question: "Como ler temperatura com Arduino e sensor DHT22?" },
+      { label: "O que é bootloader",question: "O que é o bootloader do Arduino e como funciona?" },
+      { label: "Upload de sketch",  question: "Como fazer upload do código sketch para o Arduino?" },
+      { label: "I2C com Wire.h",    question: "Como usar I2C no Arduino com a biblioteca Wire?" },
+      { label: "Protocolo SPI",     question: "Como usar SPI no Arduino?" },
+      { label: "volatile em C++",   question: "O que é volatile em C++ para Arduino?" },
+      { label: "Arrays em C++",     question: "Como usar array vetor no Arduino?" },
+      { label: "Variáveis/const",   question: "Como declarar variável global ou constante no Arduino?" },
+      { label: "O que é sketch",    question: "O que é um sketch no Arduino?" },
+    ],
+  },
+  {
+    id: "esp32",
+    label: "ESP32",
+    emoji: "📡",
+    desc: "WiFi, BT, OTA, deep sleep",
+    questions: [
+      { label: "Conectar WiFi",     question: "Como conectar o ESP32 ao WiFi?" },
+      { label: "Bluetooth",         question: "Como usar Bluetooth no ESP32?" },
+      { label: "OTA update",        question: "Como fazer OTA update no ESP32?" },
+      { label: "Deep Sleep",        question: "Como usar deep sleep no ESP32 para economizar energia?" },
+      { label: "ESP32 vs ESP8266",  question: "Qual a diferença entre ESP32 e ESP8266?" },
+      { label: "Servidor Web",      question: "Como criar servidor web no ESP32?" },
+      { label: "MQTT",              question: "Como usar MQTT no ESP32?" },
+      { label: "ADC analógico",     question: "Como usar ADC analógico no ESP32?" },
+      { label: "DAC analógico",     question: "Como usar DAC saída analógica no ESP32?" },
+      { label: "Dual Core",         question: "Como usar dual core no ESP32?" },
+      { label: "SPIFFS/LittleFS",   question: "Como usar SPIFFS ou LittleFS no ESP32?" },
+      { label: "GPIO config",       question: "Como configurar GPIO no ESP32?" },
+      { label: "Hora NTP",          question: "Como usar NTP para obter horário no ESP32?" },
+    ],
+  },
+  {
+    id: "sensores",
+    label: "Sensores",
+    emoji: "🔭",
+    desc: "DHT, HC-SR04, PIR, RFID",
+    questions: [
+      { label: "HC-SR04 distância", question: "Como usar sensor ultrassônico HC-SR04?" },
+      { label: "PIR movimento",     question: "Como usar sensor PIR HC-SR501 para detectar movimento?" },
+      { label: "LDR luz",           question: "Como usar LDR foto-resistor sensor de luz?" },
+      { label: "MPU6050 IMU",       question: "Como usar MPU6050 acelerômetro e giroscópio?" },
+      { label: "Sensor de chuva",   question: "Como usar sensor de chuva FC-37?" },
+      { label: "BMP280 pressão",    question: "Como usar BMP280 sensor de pressão barométrica?" },
+      { label: "DS18B20 1-Wire",    question: "Como usar DS18B20 temperatura com OneWire?" },
+      { label: "Sensor gás MQ-2",   question: "Como usar sensor de gás MQ-2?" },
+      { label: "Encoder rotativo",  question: "Como usar encoder rotativo KY-040?" },
+      { label: "RFID RC522",        question: "Como usar RFID RC522 leitora de cartão?" },
+    ],
+  },
+  {
+    id: "eletronica",
+    label: "Eletrônica",
+    emoji: "⚡",
+    desc: "Resistores, capacitores, lei de Ohm",
+    questions: [
+      { label: "O que é resistor",  question: "O que é um resistor e para que serve em Ohm?" },
+      { label: "Resistor p/ LED",   question: "Como calcular o resistor para LED?" },
+      { label: "O que é capacitor", question: "O que é um capacitor e qual sua função?" },
+      { label: "Transistor BJT",    question: "O que é um transistor BJT NPN PNP?" },
+      { label: "O que é diodo",     question: "O que é um diodo e como funciona?" },
+      { label: "O que é relé",      question: "O que é um relé e como funciona para controlar 220V?" },
+      { label: "Lei de Ohm",        question: "O que é a Lei de Ohm e qual a fórmula?" },
+      { label: "Divisor de tensão", question: "O que é um divisor de tensão com resistores?" },
+      { label: "Ponte H motor",     question: "Como funciona a ponte H para controlar motor DC?" },
+      { label: "Pull-up/Pull-down", question: "O que é pull-up e pull-down resistor no pino digital?" },
+    ],
+  },
+  {
+    id: "serial",
+    label: "Comunicação",
+    emoji: "🔗",
+    desc: "I2C, SPI, UART, baud rate",
+    questions: [
+      { label: "Protocolo I2C",     question: "O que é o protocolo I2C e como funciona o barramento?" },
+      { label: "Protocolo SPI",     question: "O que é o protocolo SPI e como funciona MOSI MISO SCK?" },
+      { label: "UART / Serial",     question: "O que é UART protocolo serial TX RX baud?" },
+      { label: "Serial.begin()",    question: "Como configurar Serial.begin e baud rate no Arduino?" },
+      { label: "Debugar serial",    question: "Como debugar comunicação serial com analisador lógico?" },
+    ],
+  },
+  {
+    id: "atuadores",
+    label: "Atuadores",
+    emoji: "⚙️",
+    desc: "Motor, buzzer, LED, display",
+    questions: [
+      { label: "Motor de passo",    question: "Como controlar motor de passo stepper com driver A4988?" },
+      { label: "Buzzer som",        question: "Como usar buzzer para gerar tom e som no Arduino?" },
+      { label: "Fita LED WS2812",   question: "Como controlar fita LED endereçável WS2812 NeoPixel?" },
+      { label: "Display OLED",      question: "Como usar display OLED SSD1306 I2C com texto e gráfico?" },
+      { label: "LCD 16x2 I2C",      question: "Como usar LCD 16x2 display com módulo I2C?" },
+    ],
+  },
+  {
+    id: "iot",
+    label: "IoT & Cloud",
+    emoji: "🌐",
+    desc: "MQTT, REST API, WebSocket",
+    questions: [
+      { label: "O que é MQTT",      question: "O que é MQTT protocolo IoT publish subscribe tópico?" },
+      { label: "ThingSpeak",        question: "Como enviar dados para ThingSpeak na nuvem?" },
+      { label: "REST API",          question: "O que é REST API HTTP GET POST JSON?" },
+      { label: "WebSocket",         question: "Como usar WebSocket para comunicação em tempo real no ESP32?" },
+      { label: "Broker MQTT",       question: "O que é um broker MQTT como Mosquitto ou HiveMQ?" },
+    ],
+  },
+  {
+    id: "energia",
+    label: "Energia",
+    emoji: "🔋",
+    desc: "Baterias, reguladores, TP4056",
+    questions: [
+      { label: "Bateria LiPo/18650",question: "Como alimentar projeto com bateria LiPo ou 18650?" },
+      { label: "Regulador de tensão",question: "O que é regulador de tensão AMS1117 LM7805 LDO?" },
+      { label: "Carregar LiPo",     question: "Como carregar bateria LiPo com módulo TP4056?" },
+    ],
+  },
+  {
+    id: "pcb",
+    label: "PCB",
+    emoji: "🖨️",
+    desc: "Projeto de placa, SMD, EasyEDA",
+    questions: [
+      { label: "O que é PCB",       question: "O que é PCB placa de circuito impresso com camadas?" },
+      { label: "Fazer PCB em casa", question: "Como fazer PCB em casa com transferência laser?" },
+    ],
+  },
+  {
+    id: "programacao",
+    label: "C++ Avançado",
+    emoji: "💻",
+    desc: "Ponteiros, PROGMEM, WDT",
+    questions: [
+      { label: "Ponteiros C++",     question: "O que é ponteiro pointer em C++ para embarcados?" },
+      { label: "PROGMEM Flash",     question: "O que é PROGMEM para armazenar dados na Flash do Arduino?" },
+      { label: "Watchdog Timer",    question: "Como usar watchdog timer WDT para reiniciar Arduino travado?" },
+    ],
+  },
+  {
+    id: "devgenius",
+    label: "DevGenius",
+    emoji: "🚀",
+    desc: "Plataforma, Lab, Provas, FAQ",
+    questions: [
+      { label: "O que é DevGenius", question: "O que é a plataforma DevGenius para que serve?" },
+      { label: "Como usar Laboratório", question: "Como usar o laboratório simulador workspace para projetos?" },
+      { label: "Provas e certificação", question: "Como fazer as provas e certificação no DevGenius?" },
+      { label: "Base de Código",    question: "Como usar a base de código para aprender C++ e JavaScript?" },
+      { label: "Configurar perfil", question: "Como configurar perfil foto status conta no DevGenius?" },
+    ],
+  },
+  {
+    id: "projetos",
+    label: "Projetos",
+    emoji: "🛠️",
+    desc: "Estação meteo, irrigação, alarme",
+    questions: [
+      { label: "Estação meteorológica", question: "Como fazer estação meteorológica com temperatura umidade e pressão?" },
+      { label: "Sistema de alarme",    question: "Como fazer sistema de alarme com detecção de presença?" },
+      { label: "Controle temperatura", question: "Como fazer controlador de temperatura PID com heater?" },
+      { label: "Irrigação automática", question: "Como fazer sistema de irrigação automática com sensor de umidade do solo?" },
+      { label: "Smart Home",           question: "Como fazer smart home casa inteligente com ESP32 e automação?" },
+      { label: "Datalogger SD Card",   question: "Como fazer datalogger para registrar dados em SD card CSV?" },
+    ],
+  },
+];

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import bcrypt from "bcryptjs";
 import { User } from "../App";
 import { motion, AnimatePresence } from "motion/react";
-import { Lock, Mail, User as UserIcon, Calendar, ArrowRight, ShieldCheck, Cpu, Key, Eye, EyeOff, Sparkles, X, ChevronRight, Play, Layout, MessageSquare, Terminal, GraduationCap, Target, PenTool, HandMetal, Zap } from "lucide-react";
+import { Lock, Mail, User as UserIcon, Calendar, ArrowRight, ShieldCheck, Cpu, Key, Eye, EyeOff, Sparkles, X, ChevronRight, Play, Layout, MessageSquare, Terminal, GraduationCap, Target, PenTool, HandMetal, Zap, Map } from "lucide-react";
 
 const BCRYPT_ROUNDS = 10;
 const RECOVERY_TTL_MS = 15 * 60 * 1000;
@@ -18,11 +18,14 @@ const verifyPassword = (plain: string, stored: string): boolean => {
 interface AuthPageProps {
   onLogin: (user: User) => void;
   onClose?: () => void;
+  onStartTour?: () => void;
+  onStartGuest?: () => void;
+  guestCooldown?: number; // segundos de bloqueio restantes
 }
 
 type AuthMode = "login" | "register" | "forgot" | "verify" | "reset" | "welcome" | "questionnaire";
 
-export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
+export default function AuthPage({ onLogin, onClose, onStartTour, onStartGuest, guestCooldown = 0 }: AuthPageProps) {
   const [mode, setMode] = useState<AuthMode>("welcome");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -279,6 +282,58 @@ export default function AuthPage({ onLogin, onClose }: AuthPageProps) {
                     >
                       CRIAR MINHA CONTA
                     </button>
+                    {onStartTour && (
+                      <button
+                        onClick={onStartTour}
+                        className="w-full h-14 bg-white/5 border border-cyan-500/20 hover:border-cyan-500/50 hover:bg-cyan-500/5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 text-cyan-400 group"
+                      >
+                        <Map className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                        FAZER UM TOUR PELO SITE
+                      </button>
+                    )}
+                    {/* Botão de Convidado ou bloqueio de cooldown */}
+                    {guestCooldown > 0 ? (
+                      // Em cooldown — mostra timer + botões de login/cadastro
+                      <div className="w-full space-y-3">
+                        <div className="w-full py-3 px-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center gap-3 text-red-400">
+                          <span className="text-base leading-none">🔒</span>
+                          <div className="text-left">
+                            <p className="text-[10px] font-black uppercase tracking-widest">Acesso de convidado bloqueado</p>
+                            <p className="text-[9px] font-bold opacity-70">
+                              Disponível em: {Math.floor(guestCooldown / 60)}:{String(guestCooldown % 60).padStart(2, "0")}
+                            </p>
+                          </div>
+                        </div>
+                        {/* Botões de login/cadastro mesmo durante cooldown */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => setMode("login")}
+                            className="h-12 bg-cyan-500/10 border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-500/15 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-cyan-400"
+                          >
+                            Fazer Login
+                          </button>
+                          <button
+                            onClick={() => setMode("register")}
+                            className="h-12 bg-white/5 border border-white/10 hover:border-white/20 hover:bg-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-neutral-300"
+                          >
+                            Cadastrar
+                          </button>
+                        </div>
+                      </div>
+                    ) : onStartGuest ? (
+                      <button
+                        onClick={onStartGuest}
+                        className="w-full h-14 bg-amber-500/10 border border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/15 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 text-amber-400 group"
+                      >
+                        <span className="text-base leading-none">⏱</span>
+                        CONTINUAR COMO CONVIDADO (10 MIN — ACESSO TOTAL)
+                      </button>
+                    ) : null}
+                    <p className="text-center text-[9px] text-neutral-700 font-bold uppercase tracking-widest">
+                      {guestCooldown > 0
+                        ? "Cooldown ativo · faça login ou cadastre-se para acesso imediato"
+                        : "10 min de acesso completo · após: bloqueio de 5 min · histórico zerado"}
+                    </p>
                   </div>
               </motion.div>
             )}

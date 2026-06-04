@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=VT323&family=Roboto:wght@300;400;500;700;900&family=Fira+Code:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -6,12 +6,53 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+/* ── Variáveis de tema ── */
+:root {
+  --accent-hex: #22d3ee;   /* cyan-400 padrão */
+}
+
+/* ── Temas via data-theme ── */
+[data-theme="amber_free"] {
+  --accent-hex: #fbbf24;
+}
+[data-theme="retro_free"] {
+  --accent-hex: #22d3ee;
+  font-family: "JetBrains Mono", monospace !important;
+}
+[data-theme="vapor"] {
+  --accent-hex: #c084fc;
+}
+[data-theme="matrix_pro"] {
+  --accent-hex: #34d399;
+  font-family: "JetBrains Mono", monospace !important;
+}
+[data-theme="rose_neon"] {
+  --accent-hex: #fb7185;
+}
+
+/* Aplica fonte mono em toda a página quando tema mono está ativo */
+[data-theme="retro_free"] *,
+[data-theme="matrix_pro"] * {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Aplica cor de acento do tema no scrollbar */
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent-hex) !important;
+  opacity: 0.5;
+}
+
+/* Classes dinâmicas de acento — usadas via accentClass nos componentes */
+.theme-accent-border  { border-color: var(--accent-hex) !important; }
+.theme-accent-text    { color: var(--accent-hex) !important; }
+.theme-accent-bg      { background-color: var(--accent-hex) !important; }
+.theme-accent-shadow  { box-shadow: 0 0 20px color-mix(in srgb, var(--accent-hex) 30%, transparent) !important; }
+
 @layer base {
   body {
     @apply bg-neutral-950 text-neutral-100 antialiased;
   }
 
-  /* Custom Scrollbar for a "sharp" tech feel */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -22,10 +63,10 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-neutral-700/50 rounded-full hover:bg-cyan-500/50 transition-colors;
+    @apply bg-neutral-700/50 rounded-full;
+    transition: background-color 0.2s;
   }
 
-  /* Hide scrollbar for cleaner UI in specific sections */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -55,4 +96,3 @@
     overflow: visible !important;
   }
 }
-

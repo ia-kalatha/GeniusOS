@@ -14,4 +14,14 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
   },
+  server: {
+    // Ignora arquivos JSON de dados do servidor.
+    // Sem isso, cada escrita em users.json / reward_events.json / scores.json
+    // dispara um full-reload do Vite via HMR — causando o "refresh" inesperado.
+    watch: {
+      ignored: [
+        '**/*.json',
+      ],
+    },
+  },
 });

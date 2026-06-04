@@ -1,0 +1,20 @@
+[
+  { "id": "theme_free_amber",   "name": "Tema Âmbar",            "cost": 120, "type": "theme",  "icon": "🟡", "desc": "Fundo e acento dourado/âmbar em toda a interface." },
+  { "id": "theme_vapor",        "name": "Tema Vapor Wave",        "cost": 150, "type": "theme",  "icon": "🌊", "desc": "Fundo e acento roxo neon em toda a interface." },
+  { "id": "theme_matrix_pro",   "name": "Tema Matrix Pro",        "cost": 200, "type": "theme",  "icon": "🖥️", "desc": "Fundo e acento verde esmeralda em toda a interface." },
+  { "id": "theme_rose",         "name": "Tema Rosa Neon",         "cost": 120, "type": "theme",  "icon": "🌸", "desc": "Fundo e acento rosa vibrante em toda a interface." },
+  { "id": "font_space",         "name": "Fonte Space Grotesk",    "cost": 50,  "type": "font",   "icon": "✏️", "desc": "Fonte sans-serif moderna Space Grotesk." },
+  { "id": "font_roboto",        "name": "Fonte Roboto",           "cost": 50,  "type": "font",   "icon": "✏️", "desc": "Fonte sans-serif Roboto do Google." },
+  { "id": "font_orbitron",      "name": "Fonte Orbitron",         "cost": 80,  "type": "font",   "icon": "🔭", "desc": "Fonte futurista Orbitron para interface sci-fi." },
+  { "id": "font_jetbrains",     "name": "Fonte JetBrains Mono",   "cost": 60,  "type": "font",   "icon": "💻", "desc": "Fonte mono para devs: JetBrains Mono." },
+  { "id": "font_fira",          "name": "Fonte Fira Code",        "cost": 60,  "type": "font",   "icon": "💻", "desc": "Fonte mono com ligaduras: Fira Code." },
+  { "id": "font_sharetech",     "name": "Fonte Share Tech Mono",  "cost": 70,  "type": "font",   "icon": "📡", "desc": "Fonte mono tech: Share Tech Mono." },
+  { "id": "font_vt323",         "name": "Fonte VT323",            "cost": 90,  "type": "font",   "icon": "👾", "desc": "Fonte pixel retrô VT323." },
+  { "id": "font_courier",       "name": "Fonte Courier New",      "cost": 40,  "type": "font",   "icon": "🖨️", "desc": "Fonte clássica de máquina de escrever." },
+  { "id": "badge_hacker",       "name": "Badge Kernel Hacker",    "cost": 100, "type": "badge",  "icon": "🔶", "desc": "Badge dourado exibido no perfil e no chat da comunidade." },
+  { "id": "badge_god",          "name": "Badge Hardware God",     "cost": 250, "type": "badge",  "icon": "💎", "desc": "Badge platina para os verdadeiros mestres do hardware." },
+  { "id": "title_elite",        "name": "Título ELITE",           "cost": 300, "type": "title",  "icon": "⚡", "desc": "Prefixo [ELITE] exibido antes do seu nome no chat." },
+  { "id": "title_arquiteto",    "name": "Título ARQUITETO",       "cost": 500, "type": "title",  "icon": "🏛️", "desc": "Prefixo [ARQUITETO] — o mais raro do DevGenius." },
+  { "id": "guest_extend",       "name": "Sessão Visitante 20 min","cost": 150, "type": "session","icon": "⏱️", "desc": "Dobra o tempo de sessão de visitante de 6 para 20 minutos." },
+  { "id": "coin_boost_24h",     "name": "Boost 2× por 24h",      "cost": 100, "type": "boost",  "icon": "🚀", "desc": "Todas as moedas ganhas nas próximas 24 horas são dobradas." }
+]

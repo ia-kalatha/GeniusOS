@@ -6,6 +6,15 @@ import { PROJECTS, Project } from "../data/projects";
 import { QUESTIONS, TRILHA_INFO, MODULO_INFO, Question, Trilha, Modulo } from "../data/questions";
 import { buscarResposta, IA_GUIDED_CATEGORIES, GuidedCategory } from "../data/iaKnowledge";
 import { getProjectsForComponent, ComponentProject } from "../data/componentProjects";
+import { IA_LEARN_MODULES, IALearnModule } from "../data/iaLearnContent";
+import CircuitView from "./CircuitView";
+import CommunityView from "./CommunityView";
+import FlappyCode from "./FlappyCode";
+import DinoRunner from "./DinoRunner";
+import RewardsView from "./RewardsView";
+import CoinWidget from "./CoinWidget";
+import { useRewards } from "../context/RewardsContext";
+import { LevelCard, LevelChip, useLevelInfo } from "./LevelBadge";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
@@ -43,16 +52,21 @@ import {
   Trophy, Lock, Zap, Activity, Gauge, Battery, Play, History, BookOpen,
   Settings, Monitor, UserCircle, Moon, Sun, Type, Image as ImageIcon, Github, Eye, EyeOff,
   Book, StickyNote, Trash2, Edit3, Save, Fuel, ShieldAlert, Smartphone,
-  BookMarked, BarChart2, FolderOpen, ChevronDown, BadgeCheck, Menu, Home
+  BookMarked, BarChart2, FolderOpen, ChevronDown, BadgeCheck, CircuitBoard, Gamepad2,
+  Maximize2, Minimize2, Menu, Home, Share2, Copy, Twitter, Link
 } from "lucide-react";
 
 interface DashboardProps {
   user: User | null;
   onLogout: () => void;
   onAuthRequired: () => void;
+  tourActive?: boolean;
+  onEndTour?: () => void;
+  guestTimeLeft?: number | null;
+  guestFullAccess?: boolean; // visitante com acesso total (6 min liberados)
 }
 
-type Tab = "placas" | "componentes" | "hardware_pc" | "workspace" | "ia" | "code" | "projetos" | "provas" | "sobre" | "configuracoes" | "faq" | "notas";
+type Tab = "placas" | "componentes" | "hardware_pc" | "workspace" | "ia" | "code" | "projetos" | "provas" | "sobre" | "configuracoes" | "faq" | "notas" | "circuito" | "aprender_ia" | "comunidade" | "games" | "recompensas";
 
 interface ChatMessage {
   role: "user" | "ia";
@@ -96,21 +110,46 @@ const saveCollection = (c: CollectionState) => {
 };
 const defaultEntry = (): ItemCollection => ({ marked: false, markedAt: null, completedProjects: [] });
 
+// ── Definição completa de temas ──────────────────────────────────────────────
+type ThemeDef = {
+  id: string;
+  label: string;
+  icon: string;
+  rewardId: string | null;  // null = grátis
+  accentClass: string;      // cor do acento (cx-400, amber-400, etc.)
+  accentHex: string;        // para preview colorido
+  fontClass: string;        // font-sans | font-mono
+  bgClass: string;          // bg-neutral-950 | bg-[#050f05] etc.
+  previewBg: string;        // cor hexadecimal do preview
+};
+
+const ALL_THEMES: ThemeDef[] = [
+  { id: "kernel",       label: "Kernel (padrão)", icon: "🖤", rewardId: null,               accentClass: "cyan-400",    accentHex: "#22d3ee", fontClass: "font-sans",  bgClass: "bg-neutral-950",    previewBg: "#0a0a0a" },
+  { id: "amber_free",   label: "Âmbar",           icon: "🟡", rewardId: "theme_free_amber", accentClass: "amber-400",   accentHex: "#fbbf24", fontClass: "font-sans",  bgClass: "bg-neutral-950",    previewBg: "#1a1200" },
+  { id: "retro_free",   label: "Retro Tipo",      icon: "📟", rewardId: "theme_free_retro", accentClass: "cyan-400",    accentHex: "#22d3ee", fontClass: "font-mono",  bgClass: "bg-neutral-950",    previewBg: "#0a1010" },
+  { id: "vapor",        label: "Vapor Wave",      icon: "🌊", rewardId: "theme_vapor",      accentClass: "purple-400",  accentHex: "#c084fc", fontClass: "font-sans",  bgClass: "bg-neutral-950",    previewBg: "#100515" },
+  { id: "matrix_pro",   label: "Matrix Pro",      icon: "🖥️", rewardId: "theme_matrix_pro", accentClass: "emerald-400", accentHex: "#34d399", fontClass: "font-mono",  bgClass: "bg-neutral-950",    previewBg: "#051505" },
+  { id: "rose_neon",    label: "Rosa Neon",       icon: "🌸", rewardId: "theme_rose",       accentClass: "rose-400",    accentHex: "#fb7185", fontClass: "font-sans",  bgClass: "bg-neutral-950",    previewBg: "#150510" },
+];
+
+// Legacy (usado por setTheme antigo)
 const THEMES = {
   kernel: { bg: "neutral-950", accent: "cyan-400", font: "font-sans" },
   matrix: { bg: "transparent", accent: "emerald-500", font: "font-mono" },
   vapor: { bg: "neutral-950", accent: "purple-500", font: "font-sans" }
 };
 
-export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardProps) {
+export default function Dashboard({ user, onLogout, onAuthRequired, tourActive = false, onEndTour, guestTimeLeft, guestFullAccess = false }: DashboardProps) {
+  const { claimEvent } = useRewards();
   const [activeTab, setActiveTab] = useState<Tab>("placas");
   const [viewMode, setViewMode] = useState<"compact" | "expanded">("expanded");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const restrictedTabs: Tab[] = ["workspace", "ia", "notas", "provas", "configuracoes"];
+  const restrictedTabs: Tab[] = ["workspace", "ia", "notas", "provas", "configuracoes", "recompensas"];
 
   const handleTabChange = (tab: Tab) => {
-    if (!user && restrictedTabs.includes(tab)) {
+    // guestFullAccess = visitante com 6 minutos — acesso total a todas as abas
+    if (!user && !guestFullAccess && restrictedTabs.includes(tab)) {
       showToast("Para acessar esse recurso faça o cadastro ou faça o login", "warn");
       onAuthRequired();
       return;
@@ -120,13 +159,16 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
   };
   const [subTab, setSubTab] = useState<string>("todos");
   const [search, setSearch] = useState("");
-  const [showTimeline, setShowTimeline] = useState(true);
+  const [showTimeline, setShowTimeline] = useState(!tourActive);
   const [basket, setBasket] = useState<HardwareItem[]>([]);
   const [selectedPlaca, setSelectedPlaca] = useState<HardwareItem | null>(null);
   const [modalItem, setModalItem] = useState<HardwareItem | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "warn" } | null>(null);
+  const [showShare, setShowShare] = useState(false);
   const [notes, setNotes] = useState<string>("");
   const [collection, setCollection] = useState<CollectionState>(loadCollection);
+  // Estado para pré-carregar projeto no Circuito
+  const [circuitPreload, setCircuitPreload] = useState<{ board: HardwareItem | null; components: HardwareItem[]; code?: string; projectTitle?: string } | null>(null);
   const [lastNoteSync, setLastNoteSync] = useState<string | null>(null);
 
   // Settings State
@@ -135,6 +177,104 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
     accent: "cyan-400",
     font: "font-sans"
   });
+  const [activeThemeId, setActiveThemeId] = useState<string>(() =>
+    localStorage.getItem(`theme_active_${user?.username}`) || "kernel"
+  );
+
+  const [colorThemeId, setColorThemeId] = useState<string>(() =>
+    localStorage.getItem(`color_theme_${user?.username}`) || "kernel"
+  );
+  const [fontThemeId, setFontThemeId] = useState<string>(() =>
+    localStorage.getItem(`font_theme_${user?.username}`) || "sans"
+  );
+
+  // ── Injeta CSS completo: acento + fundo do tema ──────────────────────────────
+  React.useEffect(() => {
+    const COLORS: Record<string, {
+      c300: string; c400: string; c500: string; c600: string;
+      bg950: string; bg900: string; bg800: string; bg700: string;
+    }> = {
+      kernel:     { c300:"#67e8f9", c400:"#22d3ee", c500:"#06b6d4", c600:"#0891b2", bg950:"#030a0d", bg900:"#061318", bg800:"#0a1f26", bg700:"#0e2d36" },
+      amber_free: { c300:"#fcd34d", c400:"#fbbf24", c500:"#f59e0b", c600:"#d97706", bg950:"#0d0800", bg900:"#1a1100", bg800:"#261900", bg700:"#332200" },
+      vapor:      { c300:"#d8b4fe", c400:"#c084fc", c500:"#a855f7", c600:"#9333ea", bg950:"#08000f", bg900:"#10001e", bg800:"#18002d", bg700:"#22003c" },
+      matrix_pro: { c300:"#6ee7b7", c400:"#34d399", c500:"#10b981", c600:"#059669", bg950:"#000d04", bg900:"#001a08", bg800:"#002610", bg700:"#003318" },
+      rose_neon:  { c300:"#fda4af", c400:"#fb7185", c500:"#f43f5e", c600:"#e11d48", bg950:"#0d0005", bg900:"#1a000a", bg800:"#260010", bg700:"#330016" },
+    };
+    const c = COLORS[colorThemeId] || COLORS.kernel;
+    const opacities = [5,10,15,20,25,30,40,50,60,70,80,90];
+    const hex2 = (pct: number) => Math.round(255 * pct / 100).toString(16).padStart(2,"0");
+    const bgOps  = opacities.map(o=>`[class*="bg-cyan-500\\/${o}"] { background-color: ${c.c500}${hex2(o)} !important; }`).join("\n");
+    const brOps  = opacities.map(o=>`[class*="border-cyan-500\\/${o}"] { border-color: ${c.c500}${hex2(o)} !important; }`).join("\n");
+    const brOps4 = opacities.map(o=>`[class*="border-cyan-400\\/${o}"] { border-color: ${c.c400}${hex2(o)} !important; }`).join("\n");
+    const shOps  = opacities.map(o=>`[class*="shadow-cyan-500\\/${o}"] { --tw-shadow-color: ${c.c500}${hex2(o)} !important; }`).join("\n");
+
+    let el = document.getElementById("dg-color-style") as HTMLStyleElement | null;
+    if (!el) { el = document.createElement("style"); el.id = "dg-color-style"; document.head.appendChild(el); }
+    el.textContent = `
+      /* ── Fundo global do tema ── */
+      html, body                           { background-color: ${c.bg950} !important; }
+      [class*="bg-neutral-950"]            { background-color: ${c.bg950} !important; }
+      [class*="bg-neutral-900"]            { background-color: ${c.bg900} !important; }
+      [class*="bg-neutral-800"]            { background-color: ${c.bg800} !important; }
+      [class*="bg-neutral-700"]            { background-color: ${c.bg700} !important; }
+      /* ── Acento: texto ── */
+      [class*="text-cyan-"]               { color: ${c.c400} !important; }
+      [class~="text-cyan-300"]            { color: ${c.c300} !important; }
+      [class~="text-cyan-400"]            { color: ${c.c400} !important; }
+      [class~="text-cyan-500"]            { color: ${c.c500} !important; }
+      [class~="text-cyan-600"]            { color: ${c.c600} !important; }
+      /* ── Acento: background ── */
+      [class~="bg-cyan-400"]              { background-color: ${c.c400} !important; }
+      [class~="bg-cyan-500"]              { background-color: ${c.c500} !important; }
+      [class*="bg-cyan-"]                 { background-color: ${c.c500} !important; }
+      ${bgOps}
+      /* ── Acento: border ── */
+      [class~="border-cyan-400"]          { border-color: ${c.c400} !important; }
+      [class~="border-cyan-500"]          { border-color: ${c.c500} !important; }
+      [class*="border-cyan-"]             { border-color: ${c.c500} !important; }
+      ${brOps}
+      ${brOps4}
+      /* ── Acento: shadow/ring ── */
+      [class*="shadow-cyan-"]             { --tw-shadow-color: ${c.c500}4d !important; }
+      [class*="ring-cyan-"]               { --tw-ring-color: ${c.c500} !important; }
+      ${shOps}
+      /* ── Hover / Focus ── */
+      [class*="hover:border-cyan-"]:hover { border-color: ${c.c500}80 !important; }
+      [class*="focus:border-cyan-"]:focus { border-color: ${c.c500}66 !important; }
+      [class*="hover:bg-cyan-"]:hover     { background-color: ${c.c500}1a !important; }
+      [class*="hover:text-cyan-"]:hover   { color: ${c.c400} !important; }
+      /* ── Selection ── */
+      ::selection { background-color: ${c.c500}4d !important; }
+      /* ── Scrollbar ── */
+      ::-webkit-scrollbar-thumb           { background-color: ${c.c600}60 !important; }
+      ::-webkit-scrollbar-thumb:hover     { background-color: ${c.c500}99 !important; }
+      /* ── CSS var global ── */
+      :root { --accent-hex: ${c.c400}; --bg-950: ${c.bg950}; --bg-900: ${c.bg900}; }
+    `;
+    if (user) localStorage.setItem(`color_theme_${user.username}`, colorThemeId);
+  }, [colorThemeId, user]);
+
+  // ── Injeta CSS completo para fonte (TODAS as letras) ─────────────────────────
+  React.useEffect(() => {
+    const FONT_STACKS: Record<string, string> = {
+      inter:       '"Inter", ui-sans-serif, system-ui, sans-serif',
+      space:       '"Space Grotesk", ui-sans-serif, system-ui, sans-serif',
+      roboto:      '"Roboto", ui-sans-serif, system-ui, sans-serif',
+      orbitron:    '"Orbitron", ui-sans-serif, system-ui, sans-serif',
+      jetbrains:   '"JetBrains Mono", "Fira Code", ui-monospace, monospace',
+      fira:        '"Fira Code", "JetBrains Mono", ui-monospace, monospace',
+      sharetech:   '"Share Tech Mono", ui-monospace, monospace',
+      vt323:       '"VT323", ui-monospace, monospace',
+      courier:     '"Courier New", "Lucida Console", ui-monospace, monospace',
+    };
+    const f = FONT_STACKS[fontThemeId] || FONT_STACKS.inter;
+    let el = document.getElementById("dg-font-style") as HTMLStyleElement | null;
+    if (!el) { el = document.createElement("style"); el.id = "dg-font-style"; document.head.appendChild(el); }
+    el.textContent = `
+      *, *::before, *::after { font-family: ${f} !important; }
+    `;
+    if (user) localStorage.setItem(`font_theme_${user.username}`, fontThemeId);
+  }, [fontThemeId, user]);
   const [profile, setProfile] = useState({
     photo: user?.profileImage || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100",
     status: "Online"
@@ -156,11 +296,25 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
   useEffect(() => {
     setSubTab("todos");
     if (!user) return;
-    // Load notes from localStorage
-    try {
-      const saved = localStorage.getItem(`devgenius_notes_${user.username}`);
-      if (saved) setNotes(saved);
-    } catch (e) { console.error("Erro ao carregar notas."); }
+    const loadNotes = async () => {
+      // Tenta carregar do servidor primeiro, fallback para localStorage
+      try {
+        const res = await fetch(`/api/notes/${encodeURIComponent(user.username)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.notes && typeof data.notes === "string" && data.notes.trim()) {
+            setNotes(data.notes);
+            localStorage.setItem(`devgenius_notes_${user.username}`, data.notes);
+            return;
+          }
+        }
+      } catch {}
+      try {
+        const saved = localStorage.getItem(`devgenius_notes_${user.username}`);
+        if (saved) setNotes(saved);
+      } catch (e) { console.error("Erro ao carregar notas."); }
+    };
+    loadNotes();
   }, [activeTab, user?.username]);
 
   // ─── Funções de coleção ────────────────────────────────────────────────
@@ -175,16 +329,21 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
     setCollection(updated);
     saveCollection(updated);
     showToast(next.marked ? "Adicionado à coleção ⭐" : "Removido da coleção");
+    // Coins: +5 ao marcar pela primeira vez
+    if (next.marked && user) claimEvent(`collection_mark:${itemId}`, 5);
   };
 
   const toggleProject = (itemId: string, projIdx: number) => {
     const prev = collection[itemId] ?? defaultEntry();
-    const done = prev.completedProjects.includes(projIdx)
+    const wasDone = prev.completedProjects.includes(projIdx);
+    const done = wasDone
       ? prev.completedProjects.filter(i => i !== projIdx)
       : [...prev.completedProjects, projIdx];
     const updated = { ...collection, [itemId]: { ...prev, completedProjects: done } };
     setCollection(updated);
     saveCollection(updated);
+    // Coins: +20 ao concluir projeto pela primeira vez
+    if (!wasDone && user) claimEvent(`project_complete:${itemId}:${projIdx}`, 20);
   };
 
   const getEntry = (itemId: string) => collection[itemId] ?? defaultEntry();
@@ -196,6 +355,27 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
       setLastNoteSync(new Date().toLocaleTimeString());
     } catch (e) {
       showToast("Falha na sincronização das notas.", "warn");
+    }
+  };
+
+  const saveNotesToServer = async (content: string) => {
+    if (!user) return;
+    try {
+      // Sync para o servidor
+      const res = await fetch(`/api/notes/${encodeURIComponent(user.username)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: content }),
+      });
+      if (res.ok) {
+        localStorage.setItem(`devgenius_notes_${user.username}`, content);
+        setLastNoteSync(new Date().toLocaleTimeString());
+        showToast("✅ Notas salvas na sua conta!");
+      } else {
+        showToast("Falha ao salvar na conta.", "warn");
+      }
+    } catch {
+      showToast("Erro de conexão ao salvar.", "warn");
     }
   };
 
@@ -212,6 +392,16 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
     };
     setTestProgress(newProgress);
     localStorage.setItem(`tests_v3_${user.username}`, JSON.stringify(newProgress));
+
+    // ── Coins: acertos + trilha perfeita ──────────────────────────────────
+    if (score > 0) {
+      // Moedas por acertos (repetível a cada tentativa)
+      claimEvent(`provas_correct:${trilha}:${Date.now()}`, score * 2);
+    }
+    if (score === total && !previous.completed) {
+      // Trilha perfeita pela primeira vez
+      claimEvent(`trilha_perfect:${trilha}`, 50);
+    }
   };
 
   // IA - Workspace Compilation
@@ -420,21 +610,33 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
         </div>
 
         <nav className={`flex-1 ${viewMode === "compact" ? "px-2" : "px-4"} space-y-2 overflow-y-auto scrollbar-visible min-h-0`}>
-          <NavItem icon={Cpu} label={viewMode === "expanded" ? "Controladoras" : ""} active={activeTab === "placas"} onClick={() => handleTabChange("placas")} />
-          <NavItem icon={Layers} label={viewMode === "expanded" ? "Componentes" : ""} active={activeTab === "componentes"} onClick={() => handleTabChange("componentes")} />
-          <NavItem icon={Monitor} label={viewMode === "expanded" ? "Hardware PC" : ""} active={activeTab === "hardware_pc"} onClick={() => handleTabChange("hardware_pc")} />
-          <NavItem icon={Layout} label={viewMode === "expanded" ? "Laboratório" : ""} active={activeTab === "workspace"} onClick={() => handleTabChange("workspace")} badge={basket.length + (selectedPlaca ? 1 : 0)} />
-          <NavItem icon={Box} label={viewMode === "expanded" ? "Projetos Prontos" : ""} active={activeTab === "projetos"} onClick={() => handleTabChange("projetos")} />
-          <NavItem icon={MessageSquare} label={viewMode === "expanded" ? "DevGenius IA" : ""} active={activeTab === "ia"} onClick={() => handleTabChange("ia")} />
-          <NavItem icon={Book} label={viewMode === "expanded" ? "Bloco de Notas" : ""} active={activeTab === "notas"} onClick={() => handleTabChange("notas")} />
-          <NavItem icon={Terminal} label={viewMode === "expanded" ? "Base de Código" : ""} active={activeTab === "code"} onClick={() => handleTabChange("code")} />
-          <NavItem icon={GraduationCap} label={viewMode === "expanded" ? "Provas & Testes" : ""} active={activeTab === "provas"} onClick={() => handleTabChange("provas")} />
-          <NavItem icon={HelpCircle} label={viewMode === "expanded" ? "FAQ Engenharia" : ""} active={activeTab === "faq"} onClick={() => handleTabChange("faq")} />
+          <NavItem icon={Cpu} label={viewMode === "expanded" ? "Controladoras" : ""} active={activeTab === "placas"} onClick={() => handleTabChange("placas")} tourId="placas" />
+          <NavItem icon={Layers} label={viewMode === "expanded" ? "Componentes" : ""} active={activeTab === "componentes"} onClick={() => handleTabChange("componentes")} tourId="componentes" />
+          <NavItem icon={Monitor} label={viewMode === "expanded" ? "Hardware PC" : ""} active={activeTab === "hardware_pc"} onClick={() => handleTabChange("hardware_pc")} tourId="hardware_pc" />
+          <NavItem icon={Layout} label={viewMode === "expanded" ? "Laboratório" : ""} active={activeTab === "workspace"} onClick={() => handleTabChange("workspace")} badge={basket.length + (selectedPlaca ? 1 : 0)} tourId="workspace" />
+          <NavItem icon={Box} label={viewMode === "expanded" ? "Projetos Prontos" : ""} active={activeTab === "projetos"} onClick={() => handleTabChange("projetos")} tourId="projetos" />
+          <NavItem icon={MessageSquare} label={viewMode === "expanded" ? "DevGenius IA" : ""} active={activeTab === "ia"} onClick={() => handleTabChange("ia")} tourId="ia" />
+          <NavItem icon={Book} label={viewMode === "expanded" ? "Bloco de Notas" : ""} active={activeTab === "notas"} onClick={() => handleTabChange("notas")} tourId="notas" />
+          <NavItem icon={Terminal} label={viewMode === "expanded" ? "Base de Código" : ""} active={activeTab === "code"} onClick={() => handleTabChange("code")} tourId="code" />
+          <NavItem icon={GraduationCap} label={viewMode === "expanded" ? "Provas & Testes" : ""} active={activeTab === "provas"} onClick={() => handleTabChange("provas")} tourId="provas" />
+          <NavItem icon={HelpCircle} label={viewMode === "expanded" ? "FAQ Engenharia" : ""} active={activeTab === "faq"} onClick={() => handleTabChange("faq")} tourId="faq" />
+          <NavItem icon={CircuitBoard} label={viewMode === "expanded" ? "Circuito" : ""} active={activeTab === "circuito"} onClick={() => handleTabChange("circuito")} tourId="circuito" />
+          <NavItem icon={Sparkles} label={viewMode === "expanded" ? "Aprender IA" : ""} active={activeTab === "aprender_ia"} onClick={() => handleTabChange("aprender_ia")} tourId="aprender_ia" />
+          <NavItem icon={MessageSquare} label={viewMode === "expanded" ? "Comunidade" : ""} active={activeTab === "comunidade"} onClick={() => handleTabChange("comunidade")} tourId="comunidade" />
+          <NavItem icon={Gamepad2} label={viewMode === "expanded" ? "Games" : ""} active={activeTab === "games"} onClick={() => handleTabChange("games")} tourId="games" />
+          <NavItem icon={Trophy} label={viewMode === "expanded" ? "Recompensas" : ""} active={activeTab === "recompensas"} onClick={() => handleTabChange("recompensas")} tourId="recompensas" />
           <div className="pt-4 border-t border-white/5 space-y-2">
-            <NavItem icon={Info} label={viewMode === "expanded" ? "Sobre o V12" : ""} active={activeTab === "sobre"} onClick={() => handleTabChange("sobre")} />
-            <NavItem icon={Settings} label={viewMode === "expanded" ? "Configurações" : ""} active={activeTab === "configuracoes"} onClick={() => handleTabChange("configuracoes")} />
+            <NavItem icon={Info} label={viewMode === "expanded" ? "Sobre o V12" : ""} active={activeTab === "sobre"} onClick={() => handleTabChange("sobre")} tourId="sobre" />
+            <NavItem icon={Settings} label={viewMode === "expanded" ? "Configurações" : ""} active={activeTab === "configuracoes"} onClick={() => handleTabChange("configuracoes")} tourId="configuracoes" />
           </div>
         </nav>
+
+        {/* CoinWidget — saldo de DevCoins */}
+        {user && viewMode === "expanded" && (
+          <div className="px-4 pb-2">
+            <CoinWidget onClickPending={() => setActiveTab("recompensas")} />
+          </div>
+        )}
 
         <div className={`${viewMode === "compact" ? "p-2" : "p-4"} border-t border-white/5`}>
           {user ? (
@@ -453,7 +655,13 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
                   </div>
                 )}
               </div>
-              <button 
+              <button
+                onClick={() => setShowShare(true)}
+                className="w-full flex items-center justify-center gap-2 text-neutral-500 hover:text-cyan-400 transition-all text-xs font-black py-2 rounded-2xl hover:bg-cyan-500/5 group mb-1"
+              >
+                <Share2 className="w-4 h-4 group-hover:scale-110 transition-transform" /> {viewMode === "expanded" && "COMPARTILHAR SITE"}
+              </button>
+              <button
                 onClick={onLogout}
                 className="w-full flex items-center justify-center gap-2 text-neutral-500 hover:text-red-400 transition-all text-xs font-black py-3 rounded-2xl hover:bg-red-500/5 group"
               >
@@ -616,9 +824,17 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
               )}
 
               {activeTab === "ia" && <IAPanel />}
-              {activeTab === "notas" && <NotebookView content={notes} setContent={(c: string) => { setNotes(c); syncNotes(c); }} lastSync={lastNoteSync} />}
+              {activeTab === "notas" && <NotebookView content={notes} setContent={(c: string) => { setNotes(c); syncNotes(c); }} lastSync={lastNoteSync} onSave={() => saveNotesToServer(notes)} />}
               {activeTab === "code" && <CodeSnippets activeTab={activeTab} setActiveTab={setActiveTab} />}
-              {activeTab === "projetos" && <ProjectsView />}
+              {activeTab === "projetos" && (
+                <ProjectsView
+                  onGoToCircuit={(board, comps, code, title) => {
+                    // Inclui a placa do projeto para gerar as conexões automáticas
+                    setCircuitPreload({ board, components: comps, code, projectTitle: title });
+                    setActiveTab("circuito");
+                  }}
+                />
+              )}
               {activeTab === "provas" && (
                 <ProvasView 
                   progress={testProgress} 
@@ -627,11 +843,25 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
               )}
               {activeTab === "faq" && <FAQView />}
 
+              {activeTab === "circuito" && (
+                <div className="w-full h-full min-h-[700px]">
+                  <CircuitView preload={circuitPreload} onClearPreload={() => setCircuitPreload(null)} />
+                </div>
+              )}
+
+              {activeTab === "aprender_ia" && <IALearnView />}
+              {activeTab === "comunidade" && <CommunityView user={user} />}
+              {activeTab === "games" && <GamesHub user={user} />}
+              {activeTab === "recompensas" && <RewardsView user={user} />}
               {activeTab === "sobre" && <SobreView />}
               {activeTab === "configuracoes" && user && (
                 <ConfigView
                   theme={theme}
                   setTheme={setTheme}
+                  colorThemeId={colorThemeId}
+                  setColorThemeId={setColorThemeId}
+                  fontThemeId={fontThemeId}
+                  setFontThemeId={setFontThemeId}
                   profile={profile}
                   setProfile={setProfile}
                   user={user}
@@ -698,6 +928,118 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
           })}
         </nav>
       </main>
+
+      {/* ── Modal de Compartilhar ── */}
+      <AnimatePresence>
+        {showShare && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
+            onClick={() => setShowShare(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-neutral-900 border border-white/10 rounded-[3rem] p-10 max-w-lg w-full shadow-2xl space-y-8"
+            >
+              {/* Header */}
+              <div className="text-center space-y-3">
+                <div className="text-5xl">🚀</div>
+                <h3 className="text-3xl font-black text-white uppercase tracking-tight">Compartilhar</h3>
+                <p className="text-neutral-500 text-sm font-medium">
+                  Convide amigos para o DevGenius — a plataforma de hardware e eletrônica do futuro.
+                </p>
+              </div>
+
+              {/* URL do site */}
+              <div className="space-y-2">
+                <p className="text-[9px] font-black uppercase tracking-widest text-neutral-600 pl-1">Link do site</p>
+                <div className="flex items-center gap-2 bg-neutral-950 border border-white/10 rounded-2xl p-4">
+                  <Link className="w-4 h-4 text-neutral-600 flex-shrink-0" />
+                  <span className="flex-1 text-sm font-mono text-neutral-400 truncate">
+                    {window.location.origin}
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.origin);
+                      showToast("🔗 Link copiado!");
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500 text-neutral-950 rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"
+                  >
+                    <Copy className="w-3 h-3" /> Copiar
+                  </button>
+                </div>
+              </div>
+
+              {/* Botões de share */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* WhatsApp */}
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`🚀 Descubra o DevGenius — plataforma de hardware, eletrônica e IA!\n\n${window.location.origin}`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl hover:border-emerald-500/50 hover:bg-emerald-500/15 transition-all group"
+                >
+                  <span className="text-2xl">💬</span>
+                  <div>
+                    <p className="font-black text-sm text-emerald-400">WhatsApp</p>
+                    <p className="text-[9px] text-neutral-600 uppercase font-bold">Enviar mensagem</p>
+                  </div>
+                </a>
+
+                {/* Twitter/X */}
+                <a
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`🚀 Descobri o DevGenius — a melhor plataforma de hardware e eletrônica!\n\nValeu demais para aprender Arduino, ESP32, sensores e muito mais.\n\n${window.location.origin}`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl hover:border-blue-500/50 hover:bg-blue-500/15 transition-all group"
+                >
+                  <span className="text-2xl">🐦</span>
+                  <div>
+                    <p className="font-black text-sm text-blue-400">Twitter / X</p>
+                    <p className="text-[9px] text-neutral-600 uppercase font-bold">Publicar tweet</p>
+                  </div>
+                </a>
+
+                {/* Telegram */}
+                <a
+                  href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent("🚀 DevGenius — plataforma de hardware, eletrônica e IA. Vale muito a pena!")}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl hover:border-cyan-500/50 hover:bg-cyan-500/15 transition-all group"
+                >
+                  <span className="text-2xl">✈️</span>
+                  <div>
+                    <p className="font-black text-sm text-cyan-400">Telegram</p>
+                    <p className="text-[9px] text-neutral-600 uppercase font-bold">Enviar no Telegram</p>
+                  </div>
+                </a>
+
+                {/* Nativo (Web Share API) */}
+                <button
+                  onClick={async () => {
+                    if (navigator.share) {
+                      await navigator.share({ title: "DevGenius V12", text: "🚀 Plataforma de hardware, eletrônica e IA!", url: window.location.origin });
+                    } else {
+                      navigator.clipboard.writeText(window.location.origin);
+                      showToast("🔗 Link copiado!");
+                    }
+                  }}
+                  className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl hover:border-amber-500/50 hover:bg-amber-500/15 transition-all group"
+                >
+                  <span className="text-2xl">📤</span>
+                  <div className="text-left">
+                    <p className="font-black text-sm text-amber-400">Mais opções</p>
+                    <p className="text-[9px] text-neutral-600 uppercase font-bold">Compartilhar via...</p>
+                  </div>
+                </button>
+              </div>
+
+              <button onClick={() => setShowShare(false)}
+                className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-neutral-600 hover:text-white transition-all">
+                Fechar
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Global Detail Modal — full-screen no mobile */}
       <AnimatePresence>
@@ -841,6 +1183,12 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
                       isMarked={getEntry(modalItem.id).marked}
                       onToggleMark={() => toggleMark(modalItem.id)}
                       onToggleProject={(idx) => toggleProject(modalItem.id, idx)}
+                      onGoToCircuit={(comps, projCode, projTitle) => {
+                        setModalItem(null);
+                        setCircuitPreload({ board: null, components: comps, code: projCode, projectTitle: projTitle });
+                        setActiveTab("circuito");
+                      }}
+                      currentItem={modalItem}
                     />
 
                     <div className="mt-8 flex gap-4">
@@ -867,6 +1215,577 @@ export default function Dashboard({ user, onLogout, onAuthRequired }: DashboardP
           </div>
         )}
       </AnimatePresence>
+
+      {/* ── Tour Overlay ── */}
+      <AnimatePresence>
+        {tourActive && (
+          <TourOverlay
+            onEnd={onEndTour ?? (() => {})}
+            onTabChange={(tab) => setActiveTab(tab as Tab)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Tour Overlay Component ──────────────────────────────────────────────────
+
+interface TourStep {
+  id: number;
+  title: string;
+  emoji: string;
+  text: string;
+  tourId: string | null;  // data-tour attribute do elemento alvo
+}
+
+const TOUR_STEPS: TourStep[] = [
+  {
+    id: 0, emoji: "🎉", tourId: null,
+    title: "Bem-vindo ao DEVGENIUS!",
+    text: "O DEVGENIUS é a plataforma completa para aprender e prototipar em hardware embarcado. Aqui você domina Arduino, ESP32, sensores, eletrônica, IA e muito mais — tudo em português e num só lugar. Vamos te mostrar cada seção!",
+  },
+  {
+    id: 1, emoji: "⚡", tourId: "placas",
+    title: "Controladoras",
+    text: "Catálogo completo de microcontroladores com fichas técnicas detalhadas. Arduino Uno, Mega, ESP32, Raspberry Pi Pico, Teensy 4.1 e mais. Veja specs, voltagem, pinagem, código base e adicione ao Laboratório.",
+  },
+  {
+    id: 2, emoji: "🔧", tourId: "componentes",
+    title: "Componentes",
+    text: "Sensores, atuadores e módulos com fichas técnicas completas. DHT22, HC-SR04, MPU6050, servos, relés, displays OLED, LCD e muito mais. Cada item tem descrição técnica, forma de uso e 10 projetos guiados.",
+  },
+  {
+    id: 3, emoji: "🖥️", tourId: "hardware_pc",
+    title: "Hardware PC",
+    text: "Catálogo de componentes de computadores — GPUs, CPUs, placas-mãe e periféricos documentados. Perfeito para entender a ponte entre hardware de PC e sistemas embarcados.",
+  },
+  {
+    id: 4, emoji: "🔬", tourId: "workspace",
+    title: "Laboratório IA",
+    text: "Seu ambiente de prototipagem virtual! Selecione uma placa CORE e até 5 componentes. A IA Gemini Pro gera automaticamente o esquemático completo com código, diagrama de conexões e guia de montagem.",
+  },
+  {
+    id: 5, emoji: "📦", tourId: "projetos",
+    title: "Projetos Prontos",
+    text: "Projetos completos prontos para montar! Cada componente tem 10 projetos com código completo sem cortes, diagrama de conexões e guia passo a passo. Organizados por número de componentes e dificuldade.",
+  },
+  {
+    id: 6, emoji: "🤖", tourId: "ia",
+    title: "DevGenius IA",
+    text: "Seu assistente técnico pessoal! 150 perguntas e respostas técnicas embutidas sobre Arduino, ESP32, sensores, eletrônica e IoT — funciona mesmo offline. Use o modo GUIADO com 12 categorias ou o modo LIVRE para qualquer dúvida.",
+  },
+  {
+    id: 7, emoji: "📝", tourId: "notas",
+    title: "Bloco de Notas",
+    text: "Seu caderno digital pessoal sincronizado com a nuvem DevGenius. Anote insights de engenharia, snippets de código e ideias de projetos. Acesse de qualquer dispositivo após fazer login.",
+  },
+  {
+    id: 8, emoji: "💻", tourId: "code",
+    title: "Base de Código",
+    text: "Módulos teóricos completos para aprender na prática. C++ para Hardware, JavaScript IoT e Python — cada linguagem tem 3 aulas com mais de 1000 linhas de conteúdo educacional aprofundado sobre firmware, IoT e IA embarcada.",
+  },
+  {
+    id: 9, emoji: "🎓", tourId: "provas",
+    title: "Provas & Testes",
+    text: "Teste seus conhecimentos com questões reais! 3 módulos progressivos: Básico, Intermediário e Pro. São 270 questões no total. Cada resposta exibe a explicação educacional completa para você aprender com os erros.",
+  },
+  {
+    id: 10, emoji: "❓", tourId: "faq",
+    title: "FAQ Engenharia",
+    text: "Manual técnico de referência completo. Pesquise qualquer componente ou placa e veja: descrição técnica detalhada, resumo de hardware, forma de uso e diretrizes de implementação com exemplos de código.",
+  },
+  {
+    id: 11, emoji: "ℹ️", tourId: "sobre",
+    title: "Sobre o V12",
+    text: "Conheça a história do DEVGENIUS, o ecossistema por trás da plataforma e a filosofia de unir IA, design e engenharia de hardware em uma experiência única de aprendizado. Versão 12.4.0 — Codename: ANTIGRAVITY.",
+  },
+  {
+    id: 12, emoji: "⚙️", tourId: "configuracoes",
+    title: "Configurações",
+    text: "Personalize tudo: foto de perfil, temas visuais (Kernel, Matrix, Vapor), modo de visualização (Ampliado/Compacto), idioma (PT/EN) e segurança da conta. Veja também seu histórico de coleção e progresso nos projetos.",
+  },
+  {
+    id: 13, emoji: "🚀", tourId: null,
+    title: "Você está pronto!",
+    text: "Parabéns! Você conheceu todas as 12 seções do DEVGENIUS V12. Crie sua conta gratuita para desbloquear o Laboratório IA, Provas, Bloco de Notas e muito mais. Ou explore as seções públicas como visitante. Bem-vindo à engenharia do futuro!",
+  },
+];
+
+function TourOverlay({ onEnd, onTabChange }: { onEnd: () => void; onTabChange: (tab: string) => void }) {
+  const [step, setStep] = useState(0);
+  const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
+
+  const current = TOUR_STEPS[step];
+  const isFirst = step === 0;
+  const isLast  = step === TOUR_STEPS.length - 1;
+  const total   = TOUR_STEPS.length;
+
+  // Tour sem identificadores de aba — apenas balões centralizados na tela
+  // (spotlightRect sempre null — sem retângulos, sem destaques, sem mudança de aba)
+  useEffect(() => {
+    setSpotlightRect(null);
+    // Garante a aba inicial visível durante todo o tour
+    onTabChange("placas");
+  }, [step]);
+
+  const goNext = () => { if (!isLast) setStep(s => s + 1); else onEnd(); };
+  const goPrev = () => { if (!isFirst) setStep(s => s - 1); };
+
+  // Altura estimada do balão para cálculo de posição (px)
+  const BALLOON_H = 420;
+  const BALLOON_W_SIDE = 480;
+  const BALLOON_W_CENTER = 560;
+
+  // Posição do balão sempre dentro da tela visível
+  const tooltipStyle: React.CSSProperties = spotlightRect
+    ? {
+        position: "fixed",
+        left: Math.min(
+          window.innerWidth - BALLOON_W_SIDE - 16,
+          300
+        ),
+        top: Math.max(
+          16,
+          Math.min(
+            window.innerHeight - BALLOON_H - 16,
+            spotlightRect.top + spotlightRect.height / 2 - BALLOON_H / 2
+          )
+        ),
+        width: BALLOON_W_SIDE,
+        zIndex: 1002,
+      }
+    : {
+        position: "fixed",
+        left: Math.max(16, (window.innerWidth - BALLOON_W_CENTER) / 2),
+        top: Math.max(16, (window.innerHeight - BALLOON_H) / 2),
+        width: Math.min(BALLOON_W_CENTER, window.innerWidth - 32),
+        zIndex: 1002,
+      };
+
+  // Sem retângulo de destaque — apenas o balão flutua sobre o overlay
+
+  return (
+    <>
+      {/* Overlay escuro cobrindo toda a tela */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[1000] pointer-events-all"
+        style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(2px)" }}
+        onClick={(e) => { if (e.target === e.currentTarget) onEnd(); }}
+      />
+
+      {/* Sem retângulo de destaque — overlay escuro + balão são suficientes */}
+
+      {/* Tooltip balão */}
+      <motion.div
+        key={step}
+        initial={{ opacity: 0, x: spotlightRect ? -20 : 0, y: spotlightRect ? 0 : 20, scale: 0.95 }}
+        animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        style={tooltipStyle}
+        className="pointer-events-all"
+      >
+        <div className="bg-neutral-900 border border-cyan-500/30 rounded-[2rem] shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_0_1px_rgba(6,182,212,0.1)] overflow-hidden">
+          {/* Linha decorativa topo */}
+          <div className="h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent" />
+
+          <div className="p-8 space-y-5">
+            {/* Passo + emoji + título */}
+            <div className="flex items-start gap-5">
+              <div className="w-16 h-16 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center justify-center text-3xl shrink-0 shadow-inner">
+                {current.emoji}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.2em]">
+                    Passo {step + 1} de {total}
+                  </span>
+                  {!isFirst && !isLast && (
+                    <span className="text-[9px] font-black text-neutral-600 uppercase tracking-widest px-2 py-0.5 bg-neutral-800 rounded">
+                      {current.tourId?.toUpperCase().replace(/_/g, " ")}
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-2xl font-black text-white tracking-tight leading-tight">{current.title}</h3>
+              </div>
+            </div>
+
+            {/* Texto explicativo — maior e mais legível */}
+            <p className="text-base text-neutral-300 leading-relaxed font-medium">{current.text}</p>
+
+            {/* Barra de progresso */}
+            <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${((step + 1) / total) * 100}%` }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full"
+              />
+            </div>
+
+            {/* Bolinhas de progresso */}
+            <div className="flex items-center justify-center gap-1.5 py-1">
+              {TOUR_STEPS.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setStep(i)}
+                  className={`transition-all rounded-full ${
+                    i === step
+                      ? "w-5 h-2 bg-cyan-500"
+                      : i < step
+                      ? "w-2 h-2 bg-cyan-700"
+                      : "w-2 h-2 bg-neutral-700 hover:bg-neutral-600"
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Botões */}
+            <div className="flex items-center justify-between pt-2">
+              <button
+                onClick={onEnd}
+                className="text-xs font-black text-neutral-600 hover:text-neutral-400 uppercase tracking-widest transition-colors"
+              >
+                Pular tour
+              </button>
+
+              <div className="flex gap-3">
+                {!isFirst && (
+                  <button
+                    onClick={goPrev}
+                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2"
+                  >
+                    ← Anterior
+                  </button>
+                )}
+                <button
+                  onClick={goNext}
+                  className="px-8 py-3 bg-cyan-500 text-neutral-950 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+                >
+                  {isLast ? "🚀 Começar!" : "Próximo →"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
+// ─── Aprender IA ─────────────────────────────────────────────────────────────
+// ─── Games Hub ───────────────────────────────────────────────────────────────
+function GamesHub({ user }: { user: any }) {
+  const [activeGame, setActiveGame]     = useState<"flappy" | "dino">("flappy");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Monitora mudanças no estado de fullscreen (ESC do navegador, etc.)
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (!isFullscreen) {
+      try { await containerRef.current?.requestFullscreen(); }
+      catch { /* sem suporte */ }
+    } else {
+      try { await document.exitFullscreen(); }
+      catch { /* já fora */ }
+    }
+  };
+
+  // Esc também minimiza
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isFullscreen]);
+
+  return (
+    <div
+      ref={containerRef}
+      className={`relative transition-all duration-300 ${
+        isFullscreen
+          ? "bg-neutral-950 p-6 overflow-y-auto"
+          : ""
+      }`}
+      style={isFullscreen ? { minHeight: "100vh" } : {}}
+    >
+      {/* Seletor de jogo + botão fullscreen */}
+      <div className="flex items-center justify-center gap-4 mb-8">
+        <div className="flex bg-neutral-900 border border-white/5 p-1.5 rounded-[2rem] gap-2">
+          <button
+            onClick={() => setActiveGame("flappy")}
+            className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+              activeGame === "flappy"
+                ? "bg-cyan-500 text-neutral-950 shadow-xl shadow-cyan-500/20 scale-105"
+                : "text-neutral-500 hover:text-white"
+            }`}
+          >
+            🐦 Flappy Code
+          </button>
+          <button
+            onClick={() => setActiveGame("dino")}
+            className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+              activeGame === "dino"
+                ? "bg-emerald-500 text-neutral-950 shadow-xl shadow-emerald-500/20 scale-105"
+                : "text-neutral-500 hover:text-white"
+            }`}
+          >
+            🦕 Dino Code
+          </button>
+        </div>
+
+        {/* Botão Maximizar / Minimizar */}
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Minimizar (Esc)" : "Maximizar tela"}
+          className={`flex items-center gap-2 px-4 py-3 rounded-2xl border font-black text-[10px] uppercase tracking-widest transition-all ${
+            isFullscreen
+              ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 hover:scale-105"
+              : "bg-neutral-900 border-white/5 text-neutral-400 hover:border-cyan-500/40 hover:text-cyan-400 hover:scale-105"
+          }`}
+        >
+          {isFullscreen
+            ? <><Minimize2 className="w-4 h-4" /> Minimizar</>
+            : <><Maximize2 className="w-4 h-4" /> Maximizar</>
+          }
+        </button>
+      </div>
+
+      {/* Jogo ativo */}
+      {activeGame === "flappy" && <FlappyCode user={user} />}
+      {activeGame === "dino"   && <DinoRunner user={user} />}
+    </div>
+  );
+}
+
+function IALearnView() {
+  const { claimEvent, username } = useRewards();
+  const progressKey = username ? `ia_progress_${username}` : null;
+  const [activeModule, setActiveModule] = useState(0);
+  const [progress, setProgress] = useState<Set<number>>(() => {
+    if (!progressKey) return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem(progressKey) || "[]")); } catch { return new Set(); }
+  });
+
+  const mod = IA_LEARN_MODULES[activeModule];
+  const paragraphs = mod.content.split('\n').filter(p => p.trim().length > 0);
+
+  const colorMap: Record<string, string> = {
+    cyan:    "text-cyan-400 bg-cyan-500/10 border-cyan-500/20 hover:border-cyan-500/50",
+    amber:   "text-amber-400 bg-amber-500/10 border-amber-500/20 hover:border-amber-500/50",
+    purple:  "text-purple-400 bg-purple-500/10 border-purple-500/20 hover:border-purple-500/50",
+    emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/50",
+  };
+  const activeColor: Record<string, string> = {
+    cyan:    "bg-cyan-500 text-neutral-950 border-cyan-500",
+    amber:   "bg-amber-500 text-neutral-950 border-amber-500",
+    purple:  "bg-purple-500 text-neutral-950 border-purple-500",
+    emerald: "bg-emerald-500 text-neutral-950 border-emerald-500",
+  };
+  const glowColor: Record<string, string> = {
+    cyan:    "shadow-cyan-500/20",
+    amber:   "shadow-amber-500/20",
+    purple:  "shadow-purple-500/20",
+    emerald: "shadow-emerald-500/20",
+  };
+  const borderColor: Record<string, string> = {
+    cyan:    "border-cyan-500/30",
+    amber:   "border-amber-500/30",
+    purple:  "border-purple-500/30",
+    emerald: "border-emerald-500/30",
+  };
+
+  const markDone = (idx: number) => {
+    setProgress(prev => {
+      const s = new Set(prev);
+      const wasNew = !s.has(idx);
+      s.has(idx) ? s.delete(idx) : s.add(idx);
+      const next = new Set(s);
+      if (progressKey) localStorage.setItem(progressKey, JSON.stringify([...next]));
+      // Dispara claim FORA do setState via microtask para não causar re-render duplo
+      if (wasNew) Promise.resolve().then(() => claimEvent(`ia_module_complete:${idx}`, 30));
+      return next;
+    });
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-10 pb-20">
+      {/* Header */}
+      <div className="text-center space-y-4">
+        <h2 className="text-5xl font-black tracking-tighter uppercase">
+          APRENDER <span className="text-cyan-400">IA</span>
+        </h2>
+        <p className="text-neutral-500 font-medium max-w-2xl mx-auto">
+          4 módulos completos sobre Inteligência Artificial — do zero ao Edge AI.
+          1250+ versos de conteúdo teórico por módulo.
+        </p>
+        {/* Progresso geral */}
+        <div className="flex items-center justify-center gap-2 text-[10px] font-black text-neutral-600 uppercase tracking-widest">
+          {progress.size} de 4 módulos concluídos
+        </div>
+      </div>
+
+      {/* Seletor de módulos */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {IA_LEARN_MODULES.map((m, i) => {
+          const isActive = activeModule === i;
+          const isDone = progress.has(i);
+          return (
+            <button
+              key={m.id}
+              onClick={() => setActiveModule(i)}
+              className={`p-5 rounded-[2rem] border transition-all text-left space-y-3 relative overflow-hidden ${
+                isActive
+                  ? `${activeColor[m.color]} shadow-xl ${glowColor[m.color]}`
+                  : isDone
+                  ? "bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40"
+                  : `${colorMap[m.color]} border`
+              }`}
+            >
+              <div className="text-3xl">{m.emoji}</div>
+              <div>
+                <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isActive ? "opacity-70" : "opacity-50"}`}>
+                  Módulo {i + 1}
+                </p>
+                <p className={`text-sm font-black leading-tight ${isActive ? "text-neutral-950" : isDone ? "text-emerald-400" : ""}`}>
+                  {m.title}
+                </p>
+              </div>
+              {isDone && !isActive && (
+                <div className="absolute top-3 right-3 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="w-3 h-3 text-white" />
+                </div>
+              )}
+              <p className={`text-[9px] font-medium ${isActive ? "text-neutral-800" : "text-neutral-500"}`}>
+                {paragraphs.length}+ versos
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Conteúdo do módulo */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeModule}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.3 }}
+          className={`bg-neutral-900/40 border ${borderColor[mod.color]} rounded-[3rem] overflow-hidden shadow-2xl`}
+        >
+          {/* Header do módulo */}
+          <div className={`px-10 py-8 bg-neutral-950/60 border-b ${borderColor[mod.color]} flex items-center justify-between gap-6`}>
+            <div className="flex items-center gap-5">
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl ${colorMap[mod.color]} border`}>
+                {mod.emoji}
+              </div>
+              <div>
+                <p className="text-[9px] font-black text-neutral-600 uppercase tracking-widest mb-1">Módulo {activeModule + 1} de 4</p>
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">{mod.title}</h3>
+                <p className="text-neutral-500 text-sm font-medium">{mod.subtitle}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-black text-neutral-600 uppercase tracking-widest">
+                {paragraphs.length} versos
+              </span>
+              <button
+                onClick={() => markDone(activeModule)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+                  progress.has(activeModule)
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20"
+                    : `${colorMap[mod.color]} border hover:scale-105`
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {progress.has(activeModule) ? "Concluído ✓" : "Marcar Concluído"}
+              </button>
+            </div>
+          </div>
+
+          {/* Texto do módulo */}
+          <div className="p-10 overflow-y-auto max-h-[60vh] scrollbar-visible">
+            <div className="max-w-4xl mx-auto space-y-4 text-[15px] text-neutral-300 leading-[1.85] font-medium text-justify">
+              {paragraphs.map((para, i) => (
+                <p key={i} className={`${
+                  para.startsWith('A ') || para.startsWith('O ') || para.startsWith('Um ') || para.startsWith('Uma ')
+                    ? ""
+                    : para.length < 100
+                    ? "font-semibold text-neutral-200"
+                    : ""
+                }`}>
+                  {para}
+                </p>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer de navegação */}
+          <div className="px-10 py-6 bg-neutral-950/40 border-t border-white/5 flex items-center justify-between">
+            <button
+              onClick={() => setActiveModule(i => Math.max(0, i - 1))}
+              disabled={activeModule === 0}
+              className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30"
+            >
+              ← Módulo Anterior
+            </button>
+
+            <div className="flex gap-2">
+              {IA_LEARN_MODULES.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveModule(i)}
+                  className={`transition-all rounded-full ${
+                    i === activeModule ? "w-6 h-2.5 bg-cyan-500" :
+                    progress.has(i) ? "w-2.5 h-2.5 bg-emerald-500" :
+                    "w-2.5 h-2.5 bg-neutral-700 hover:bg-neutral-500"
+                  }`}
+                />
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                markDone(activeModule);
+                if (activeModule < IA_LEARN_MODULES.length - 1) setActiveModule(i => i + 1);
+              }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                activeModule === IA_LEARN_MODULES.length - 1
+                  ? "bg-emerald-500 text-neutral-950 hover:scale-105 shadow-lg shadow-emerald-500/20"
+                  : `${activeColor[mod.color]} hover:scale-105 shadow-lg ${glowColor[mod.color]}`
+              }`}
+            >
+              {activeModule === IA_LEARN_MODULES.length - 1 ? "🎓 Concluir Curso!" : "Próximo Módulo →"}
+            </button>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Todos concluídos */}
+      {progress.size === 4 && (
+        <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}}
+          className="text-center p-12 bg-emerald-500/5 border border-emerald-500/20 rounded-[3rem] space-y-4">
+          <div className="text-6xl">🎓</div>
+          <h3 className="text-3xl font-black text-emerald-400 uppercase tracking-tight">Curso de IA Concluído!</h3>
+          <p className="text-neutral-500 font-medium max-w-lg mx-auto">
+            Você completou os 4 módulos de Inteligência Artificial do DevGenius.
+            Agora pratique com a IA do DevGenius, experimente projetos no Circuito e teste seus conhecimentos nas Provas.
+          </p>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -927,12 +1846,111 @@ function SobreView() {
   );
 }
 
-function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, viewMode, setViewMode, collection, allItems }: any) {
+function ConfigView({ theme, setTheme, colorThemeId, setColorThemeId, fontThemeId, setFontThemeId, profile, setProfile, user, showToast, viewMode, setViewMode, collection, allItems }: any) {
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [tempPhoto, setTempPhoto] = useState(profile.photo);
   const [showPass, setShowPass] = useState(false);
+  const [configSection, setConfigSection] = useState<"perfil" | "codigos">("perfil");
+
+  // Códigos
+  const [codigoInput, setCodigoInput] = useState("");
+  const [codigoMsg, setCodigoMsg]     = useState<{ text: string; ok: boolean } | null>(null);
+  const [codigoUsed, setCodigoUsed]   = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(`codigos_usados_${user.username}`) || "[]"); } catch { return []; }
+  });
+  const [adminData, setAdminData]     = useState<any[] | null>(null);
+  const [adminSearch, setAdminSearch] = useState("");
+  const { claimEvent, purchasedItems } = useRewards();
+
+  const TITLES: Record<string, string> = {
+    title_elite:     "[ELITE]",
+    title_arquiteto: "[ARQUITETO]",
+  };
+  const ownedTitles = Object.keys(TITLES).filter(k => purchasedItems.includes(k));
+  const [activeTitle, setActiveTitleState] = useState<string>(() =>
+    localStorage.getItem(`active_title_${user.username}`) || ""
+  );
+  const applyTitle = (titleId: string) => {
+    setActiveTitleState(titleId);
+    localStorage.setItem(`active_title_${user.username}`, titleId);
+  };
+
+  const SECRET_CODES: Record<string, { coins: number; label: string; unlimited?: boolean; admin?: boolean }> = {
+    "DEVGENIUS.DAVI.@.COM.ygde0yudgsydgeygydge7ge7g": { coins: 1000000, label: "Código Fundador" },
+    "dede.adm.123.321": { coins: 0, label: "Painel Admin", unlimited: true, admin: true },
+  };
+
+  const handleRedeemCode = async () => {
+    const codeRaw = codigoInput.trim();
+    const matchKey = Object.keys(SECRET_CODES).find(k => k.toLowerCase() === codeRaw.toLowerCase());
+    if (!matchKey) {
+      setCodigoMsg({ text: "❌ Código inválido. Verifique e tente novamente.", ok: false });
+      setTimeout(() => setCodigoMsg(null), 3000);
+      return;
+    }
+    const def = SECRET_CODES[matchKey];
+
+    // ── Código Admin: abre painel de usuários ──────────────────────────────
+    if (def.admin) {
+      try {
+        const res  = await fetch(`/api/admin/users?code=${encodeURIComponent(codeRaw)}`);
+        const data = await res.json();
+        if (data.ok) {
+          setAdminData(data.users);
+          setCodigoInput("");
+          setCodigoMsg({ text: `🛡️ Acesso Admin concedido — ${data.total} usuário(s) cadastrado(s).`, ok: true });
+          setTimeout(() => setCodigoMsg(null), 4000);
+        } else {
+          setCodigoMsg({ text: data.error || "Erro ao acessar painel.", ok: false });
+          setTimeout(() => setCodigoMsg(null), 3000);
+        }
+      } catch {
+        setCodigoMsg({ text: "Erro de conexão.", ok: false });
+        setTimeout(() => setCodigoMsg(null), 3000);
+      }
+      return;
+    }
+
+    // ── Código de uso único: verifica se já foi usado ──────────────────────
+    if (!def.unlimited && codigoUsed.includes(matchKey)) {
+      setCodigoMsg({ text: "⚠️ Este código já foi resgatado por você.", ok: false });
+      setTimeout(() => setCodigoMsg(null), 3000);
+      return;
+    }
+
+    const { coins, label } = def;
+    try {
+      await fetch("/api/rewards/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username, eventKey: `codigo_especial:${matchKey.slice(0,20)}`, coins: Math.min(coins, 100) }),
+      });
+      const addRes = await fetch("/api/rewards/add-coins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username, coins, reason: label }),
+      });
+      const addData = await addRes.json();
+      if (addData.ok) {
+        if (!def.unlimited) {
+          const used = [...codigoUsed, matchKey];
+          setCodigoUsed(used);
+          localStorage.setItem(`codigos_usados_${user.username}`, JSON.stringify(used));
+        }
+        setCodigoInput("");
+        setCodigoMsg({ text: `🎉 ${label} ativado! +${coins.toLocaleString()} DevCoins adicionados!`, ok: true });
+        setTimeout(() => setCodigoMsg(null), 6000);
+      } else {
+        setCodigoMsg({ text: addData.error || "Erro ao processar código.", ok: false });
+        setTimeout(() => setCodigoMsg(null), 3000);
+      }
+    } catch {
+      setCodigoMsg({ text: "Erro de conexão. Tente novamente.", ok: false });
+      setTimeout(() => setCodigoMsg(null), 3000);
+    }
+  };
 
   // New features
   const [newName, setNewName] = useState({ first: user.firstName, last: user.lastName });
@@ -1062,16 +2080,163 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-12 pb-40"><div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+    <div className="max-w-6xl mx-auto space-y-12 pb-40">
+
+      {/* ── Tabs internas de Configurações ── */}
+      <div className="flex gap-2 bg-neutral-900 border border-white/5 p-1.5 rounded-2xl w-fit">
+        <button
+          onClick={() => setConfigSection("perfil")}
+          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            configSection === "perfil" ? "bg-cyan-500 text-neutral-950 shadow-lg" : "text-neutral-500 hover:text-white"
+          }`}
+        >
+          ⚙️ Perfil & Conta
+        </button>
+        <button
+          onClick={() => setConfigSection("codigos")}
+          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            configSection === "codigos" ? "bg-amber-500 text-neutral-950 shadow-lg" : "text-neutral-500 hover:text-white"
+          }`}
+        >
+          🎟️ Códigos
+        </button>
+      </div>
+
+      {/* ── Painel de Códigos ── */}
+      {configSection === "codigos" && (
+        <div className="space-y-6">
+          {/* Input do código */}
+          <div className="max-w-xl p-8 bg-amber-500/5 border border-amber-500/20 rounded-[3rem] space-y-6">
+            <div className="text-center space-y-2">
+              <div className="text-5xl">🎟️</div>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tight">Resgatar Código</h3>
+              <p className="text-neutral-500 text-sm font-medium">Insira um código especial para ganhar DevCoins ou desbloquear recursos exclusivos.</p>
+            </div>
+            <div className="space-y-3">
+              <input type="text" value={codigoInput} onChange={e => setCodigoInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleRedeemCode(); }}
+                placeholder="INSIRA O CÓDIGO AQUI..."
+                className="w-full bg-neutral-950 border border-white/10 rounded-2xl p-4 text-sm font-mono font-bold text-white focus:border-amber-500/50 outline-none placeholder:text-neutral-700 tracking-widest"
+              />
+              <button onClick={handleRedeemCode} disabled={!codigoInput.trim()}
+                className="w-full h-14 bg-amber-500 text-neutral-950 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100">
+                ATIVAR CÓDIGO
+              </button>
+            </div>
+            {codigoMsg && (
+              <div className={`p-4 rounded-2xl text-sm font-black text-center border ${codigoMsg.ok ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border-red-500/20 text-red-400"}`}>
+                {codigoMsg.text}
+              </div>
+            )}
+            {codigoUsed.length > 0 && (
+              <div className="pt-4 border-t border-white/5 space-y-2">
+                <p className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Códigos já resgatados</p>
+                {codigoUsed.map((c, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono">
+                    <span className="text-emerald-500">✓</span>
+                    <span className="truncate">{c.slice(0, 30)}...</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Painel Admin */}
+          {adminData && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-red-400">🛡️ Painel Administrativo</p>
+                  <p className="text-neutral-600 text-[9px] mt-0.5">{adminData.length} usuário(s) cadastrado(s)</p>
+                </div>
+                <div className="flex gap-2">
+                  <input value={adminSearch} onChange={e => setAdminSearch(e.target.value)}
+                    placeholder="Buscar usuário..."
+                    className="bg-neutral-950 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-500/40 text-white placeholder:text-neutral-700"
+                  />
+                  <button onClick={() => { setAdminData(null); setAdminSearch(""); }}
+                    className="px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black text-neutral-500 hover:text-white transition-all">
+                    ✕ Fechar
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-x-auto rounded-2xl border border-red-500/20">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-red-500/10 border-b border-red-500/20">
+                      {["#","Usuário","Nome","E-mail","Moedas","Streak","Nível","XP","Rank","Foco","Gênero","Títulos","Conquistas"].map(h => (
+                        <th key={h} className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-red-400 whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminData
+                      .filter((u: any) => !adminSearch ||
+                        u.username.toLowerCase().includes(adminSearch.toLowerCase()) ||
+                        u.firstName.toLowerCase().includes(adminSearch.toLowerCase()) ||
+                        (u.email || "").toLowerCase().includes(adminSearch.toLowerCase())
+                      )
+                      .map((u: any, i: number) => (
+                        <tr key={u.username} className="border-b border-white/5 hover:bg-white/5 transition-all">
+                          <td className="px-4 py-3 text-[10px] text-neutral-600 font-black">{i + 1}</td>
+                          <td className="px-4 py-3 text-[10px] font-black text-white font-mono whitespace-nowrap">@{u.username}</td>
+                          <td className="px-4 py-3 text-[10px] text-neutral-300 whitespace-nowrap">{u.firstName} {u.lastName}</td>
+                          <td className="px-4 py-3 text-[10px] text-neutral-400 whitespace-nowrap">{u.email || "—"}</td>
+                          <td className="px-4 py-3 text-[10px] font-black text-amber-400 whitespace-nowrap">{(u.coins || 0).toLocaleString()} 🪙</td>
+                          <td className="px-4 py-3 text-[10px] text-emerald-400 whitespace-nowrap">{u.loginStreak?.count || 0} dias</td>
+                          <td className="px-4 py-3 whitespace-nowrap"><LevelChip level={u.levelInfo?.level || 1} title={u.levelInfo?.title || "Iniciante"} /></td>
+                          <td className="px-4 py-3 text-[10px] text-purple-400 whitespace-nowrap">{(u.xp || 0).toLocaleString()} XP</td>
+                          <td className="px-4 py-3 text-[10px] text-cyan-400 whitespace-nowrap">{u.expLevel || "—"}</td>
+                          <td className="px-4 py-3 text-[10px] text-neutral-400">{u.focus || "—"}</td>
+                          <td className="px-4 py-3 text-[10px] text-neutral-500">{u.gender || "—"}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {u.titles && u.titles.length > 0
+                              ? u.titles.map((t: string, ti: number) => (
+                                  <span key={ti} className="inline-block px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[8px] font-black text-amber-400 mr-1">{t}</span>
+                                ))
+                              : <span className="text-[10px] text-neutral-700">—</span>
+                            }
+                          </td>
+                          <td className="px-4 py-3">
+                            {u.conquistas && u.conquistas.length > 0
+                              ? <div className="flex flex-wrap gap-1 min-w-[120px]">
+                                  {u.conquistas.map((c: string, ci: number) => (
+                                    <span key={ci} className="inline-block px-2 py-0.5 bg-purple-500/10 border border-purple-500/20 rounded-lg text-[8px] font-black text-purple-400">{c.replace(/_/g," ")}</span>
+                                  ))}
+                                </div>
+                              : <span className="text-[10px] text-neutral-700">—</span>
+                            }
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {configSection === "perfil" && (<><div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
       <div className="lg:col-span-4 space-y-8">
         <div className="p-12 bg-neutral-900/40 rounded-[4rem] border border-white/5 flex flex-col items-center text-center shadow-2xl relative overflow-hidden">
           <div className="w-32 h-32 bg-neutral-950 border-2 border-cyan-500/30 rounded-[2.5rem] flex items-center justify-center mb-6 overflow-hidden shadow-[0_0_30px_rgba(6,182,212,0.2)]">
             {safeImageSrc(tempPhoto) ? <img src={safeImageSrc(tempPhoto)} alt="Foto de perfil" className="w-full h-full object-cover" /> : <UserCircle className="w-16 h-16 text-neutral-700" />}
           </div>
+          {activeTitle && TITLES[activeTitle] && (
+            <span className="inline-block px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[9px] font-black text-amber-400 uppercase tracking-widest mb-2">
+              {TITLES[activeTitle]}
+            </span>
+          )}
           <h3 className="text-2xl font-black text-white">{user.firstName} {user.lastName}</h3>
           <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-2">{profile.status}</p>
-          
-          <div className="w-full mt-10 space-y-4">
+
+          {/* Nível do perfil */}
+          <div className="w-full mt-4">
+            <LevelCard username={user.username} />
+          </div>
+
+          <div className="w-full mt-6 space-y-4">
              <div className="text-left space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-neutral-600 pl-2">Foto de Perfil</label>
                 <div className="grid grid-cols-1 gap-3">
@@ -1221,19 +2386,115 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
                     </button>
                  </div>
               </div>
+              {/* ── Cores de Acento ── */}
               <div className="space-y-4">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-neutral-600 pl-2">Temas visuais</p>
-                 <div className="flex gap-4 flex-wrap">
-                    {Object.keys(THEMES).map((key) => (
-                      <button 
-                        key={key}
-                        onClick={() => setTheme(THEMES[key as keyof typeof THEMES])}
-                        className={`w-12 h-12 rounded-xl border-2 transition-transform ${theme.bg === THEMES[key as keyof typeof THEMES].bg && theme.accent === THEMES[key as keyof typeof THEMES].accent ? "border-cyan-500 scale-110 shadow-lg shadow-cyan-500/20" : "border-transparent opacity-50"}`}
-                        style={{ backgroundColor: key === "kernel" ? "#0a0a0a" : key === "matrix" ? "#051505" : "#100515" }}
-                      />
-                    ))}
-                 </div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-600 pl-2">🎨 Cor do Acento</p>
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                  {[
+                    { id: "kernel",     label: "Preto",   hex: "#22d3ee", rewardId: null },
+                    { id: "amber_free", label: "Âmbar",   hex: "#fbbf24", rewardId: "theme_free_amber" },
+                    { id: "vapor",      label: "Roxo",    hex: "#c084fc", rewardId: "theme_vapor" },
+                    { id: "matrix_pro", label: "Verde",   hex: "#34d399", rewardId: "theme_matrix_pro" },
+                    { id: "rose_neon",  label: "Rosa",    hex: "#fb7185", rewardId: "theme_rose" },
+                  ].map(ct => {
+                    const isFree   = ct.rewardId === null;
+                    const owned    = isFree || (ct.rewardId && purchasedItems.includes(ct.rewardId));
+                    const isActive = colorThemeId === ct.id;
+                    return (
+                      <button
+                        key={ct.id}
+                        disabled={!owned}
+                        onClick={() => { if (owned) setColorThemeId(ct.id); }}
+                        className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${
+                          isActive ? "border-white/60 scale-105 shadow-lg" : owned ? "border-white/10 hover:border-white/30" : "border-white/5 opacity-40 cursor-not-allowed"
+                        }`}
+                        style={{ backgroundColor: "#0a0a0a" }}
+                      >
+                        <div className="w-8 h-8 rounded-full border-2 border-white/20" style={{ backgroundColor: ct.hex }} />
+                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: isActive ? ct.hex : "#666" }}>{ct.label}</span>
+                        {!owned && <span className="text-[7px] text-amber-500">🔒 Comprar</span>}
+                        {isFree && <span className="text-[7px] text-emerald-500">GRÁTIS</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* ── Fonte ── */}
+              <div className="space-y-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-600 pl-2">🔤 Estilo de Fonte</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {([
+                    { id:"inter",     label:"Inter",         stack:'"Inter", sans-serif',             cat:"Sans",   rewardId: null },
+                    { id:"space",     label:"Space Grotesk", stack:'"Space Grotesk", sans-serif',      cat:"Sans",   rewardId:"font_space" },
+                    { id:"roboto",    label:"Roboto",        stack:'"Roboto", sans-serif',             cat:"Sans",   rewardId:"font_roboto" },
+                    { id:"orbitron",  label:"Orbitron",      stack:'"Orbitron", sans-serif',           cat:"Sci-Fi", rewardId:"font_orbitron" },
+                    { id:"jetbrains", label:"JetBrains Mono",stack:'"JetBrains Mono", monospace',      cat:"Mono",   rewardId:"font_jetbrains" },
+                    { id:"fira",      label:"Fira Code",     stack:'"Fira Code", monospace',           cat:"Mono",   rewardId:"font_fira" },
+                    { id:"sharetech", label:"Share Tech",    stack:'"Share Tech Mono", monospace',     cat:"Mono",   rewardId:"font_sharetech" },
+                    { id:"vt323",     label:"VT323",         stack:'"VT323", monospace',               cat:"Retro",  rewardId:"font_vt323" },
+                    { id:"courier",   label:"Courier New",   stack:'"Courier New", monospace',         cat:"Retro",  rewardId:"font_courier" },
+                  ] as const).map(ft => {
+                    const isFree   = ft.rewardId === null;
+                    const owned    = isFree || purchasedItems.includes(ft.rewardId as string);
+                    const isActive = fontThemeId === ft.id;
+                    const catColor: Record<string,string> = { "Sans":"#22d3ee","Sci-Fi":"#c084fc","Mono":"#34d399","Retro":"#fbbf24" };
+                    return (
+                      <button
+                        key={ft.id}
+                        disabled={!owned}
+                        onClick={() => { if (owned) setFontThemeId(ft.id); }}
+                        className={`flex flex-col items-start gap-2 p-4 rounded-2xl border-2 transition-all text-left ${
+                          isActive   ? "border-white/60 shadow-xl bg-white/5" :
+                          owned      ? "border-white/10 hover:border-white/30" :
+                                       "border-white/5 opacity-40 cursor-not-allowed"
+                        }`}
+                      >
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full" style={{ backgroundColor: catColor[ft.cat]+"22", color: catColor[ft.cat] }}>{ft.cat}</span>
+                        <span className="text-[11px] font-black uppercase tracking-widest text-white">{ft.label}</span>
+                        {isActive  && <span className="text-[7px] font-black uppercase text-emerald-400">● ATIVO</span>}
+                        {!owned    && <span className="text-[7px] text-amber-500">🔒 Comprar</span>}
+                        {isFree    && <span className="text-[7px] text-emerald-500">GRÁTIS</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── Título ativo ── */}
+              {ownedTitles.length > 0 && (
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-neutral-600 pl-2">👑 Título do Perfil</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => applyTitle("")}
+                      className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+                        activeTitle === "" ? "border-white/40 bg-white/10 text-white" : "border-white/10 text-neutral-500 hover:border-white/20"
+                      }`}
+                    >
+                      Nenhum
+                    </button>
+                    {ownedTitles.map(tk => (
+                      <button
+                        key={tk}
+                        onClick={() => applyTitle(tk)}
+                        className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+                          activeTitle === tk
+                            ? "border-amber-500/60 bg-amber-500/10 text-amber-400"
+                            : "border-white/10 text-neutral-400 hover:border-amber-500/30"
+                        }`}
+                      >
+                        {TITLES[tk]} {user.username}
+                      </button>
+                    ))}
+                  </div>
+                  {activeTitle && (
+                    <p className="text-[9px] text-neutral-600 pl-2">
+                      Aparece como: <span className="text-amber-400 font-black">{TITLES[activeTitle]} {user.username}</span> na comunidade
+                    </p>
+                  )}
+                </div>
+              )}
            </div>
         </div>
 
@@ -1282,12 +2543,13 @@ function ConfigView({ theme, setTheme, profile, setProfile, user, showToast, vie
         </div>
       </div>
 
-      </div>{/* fim grid 12 cols */}
-
+      </div>
       {/* ── Coleção & Progresso ── */}
       {collection && allItems && (
         <CollectionProgress collection={collection} allItems={allItems} />
       )}
+      </>)}
+
     </div>
   );
 }
@@ -1404,17 +2666,36 @@ function CollectionProgress({ collection, allItems }: { collection: CollectionSt
 }
 
 // ─── Seção de Projetos no Modal ─────────────────────────────────────────────
-function ModalProjectsSection({ item, entry, isMarked, onToggleMark, onToggleProject }: {
+function ModalProjectsSection({ item, entry, isMarked, onToggleMark, onToggleProject, onGoToCircuit, currentItem }: {
   item: HardwareItem;
   entry: { marked: boolean; markedAt: string | null; completedProjects: number[] };
   isMarked: boolean;
   onToggleMark: () => void;
   onToggleProject: (idx: number) => void;
+  onGoToCircuit?: (comps: HardwareItem[], code: string, title: string) => void;
+  currentItem?: HardwareItem;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const [activeProj, setActiveProj] = React.useState<number | null>(null);
   const [copiedIdx, setCopiedIdx] = React.useState<number | null>(null);
   const projects = getProjectsForComponent(item);
+
+  // Resolve componentes mencionados no projeto para HardwareItems
+  const allHW = [...DATA_PLACAS, ...DATA_COMPONENTES, ...DATA_PC_HARDWARE];
+  const resolveProjectComps = (proj: { title: string; connections: string }): HardwareItem[] => {
+    // Inclui o próprio componente/placa atual
+    const result: HardwareItem[] = currentItem ? [currentItem] : [];
+    // Tenta extrair nomes de componentes das conexões do projeto
+    const keywords = ["Arduino", "ESP32", "DHT22", "HC-SR04", "servo", "LED", "OLED", "LCD",
+      "buzzer", "relé", "MPU6050", "BMP280", "DS18B20", "PIR", "encoder"];
+    keywords.forEach(kw => {
+      if (proj.connections.toLowerCase().includes(kw.toLowerCase()) || proj.title.toLowerCase().includes(kw.toLowerCase())) {
+        const found = allHW.find(h => h.nome.toLowerCase().includes(kw.toLowerCase()));
+        if (found && !result.find(r => r.id === found.id)) result.push(found);
+      }
+    });
+    return result;
+  };
   const done = entry.completedProjects.length;
   const pct = Math.round((done / 10) * 100);
 
@@ -1545,15 +2826,26 @@ function ModalProjectsSection({ item, entry, isMarked, onToggleMark, onTogglePro
                             </pre>
                           </div>
                           {/* Marcar concluído */}
-                          <button
-                            onClick={() => onToggleProject(idx)}
-                            className={`w-full h-10 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                              isDone ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
-                                     : "bg-cyan-500 text-neutral-950 hover:scale-[1.02] active:scale-95"
-                            }`}
-                          >
-                            {isDone ? "✓ CONCLUÍDO — Clique para desmarcar" : "MARCAR COMO CONCLUÍDO"}
-                          </button>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => onToggleProject(idx)}
+                              className={`flex-1 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                                isDone ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
+                                       : "bg-cyan-500 text-neutral-950 hover:scale-[1.02] active:scale-95"
+                              }`}
+                            >
+                              {isDone ? "✓ CONCLUÍDO — Clique para desmarcar" : "MARCAR COMO CONCLUÍDO"}
+                            </button>
+                            {onGoToCircuit && (
+                              <button
+                                onClick={() => onGoToCircuit(resolveProjectComps(proj), proj.code, proj.title)}
+                                className="flex items-center gap-1.5 px-5 h-10 bg-emerald-500 text-neutral-950 rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-emerald-500/20 shrink-0"
+                                title="Abrir no Circuito com código completo"
+                              >
+                                <CircuitBoard className="w-3.5 h-3.5" /> GO!
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     )}
@@ -1568,10 +2860,11 @@ function ModalProjectsSection({ item, entry, isMarked, onToggleMark, onTogglePro
   );
 }
 
-function NavItem({ icon: Icon, label, active, onClick, badge }: any) {
+function NavItem({ icon: Icon, label, active, onClick, badge, tourId }: any) {
   return (
-    <button 
+    <button
       onClick={onClick}
+      data-tour={tourId}
       className={`w-full flex items-center gap-4 px-6 py-4 rounded-[1.5rem] transition-all relative group ${
         active ? "bg-cyan-500 text-neutral-950 shadow-[0_15px_30px_rgba(6,182,212,0.2)]" : "text-neutral-500 hover:text-neutral-300 hover:bg-white/5"
       }`}
@@ -2038,6 +3331,12 @@ function IAPanel() {
 }
 
 function CodeSnippets({ activeTab: dashboardTab, setActiveTab }: { activeTab: string, setActiveTab: (t: any) => void }) {
+  const { claimEvent, username } = useRewards();
+  const codeProgressKey = username ? `code_progress_${username}` : null;
+  const [completedLessons, setCompletedLessons] = useState<Set<string>>(() => {
+    if (!codeProgressKey) return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem(codeProgressKey) || "[]")); } catch { return new Set(); }
+  });
   const [activeLang, setActiveLang] = useState<"cpp" | "js" | "py">("cpp");
   const [activePart, setActivePart] = useState(0);
 
@@ -2391,8 +3690,24 @@ O futuro do ML embarcado aponta para modelos cada vez menores e mais eficientes:
                    >
                       <GraduationCap className="w-4 h-4" /> IR PARA PROVAS
                    </button>
-                   <button className="px-10 h-14 bg-cyan-500 text-neutral-950 rounded-2xl font-black text-[10px] tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all">
-                      CONCLUIR MÓDULO 0{activePart + 1}
+                   <button
+                     onClick={() => {
+                       const lessonKey = `${activeLang}:${activePart}`;
+                       if (!completedLessons.has(lessonKey)) {
+                         const next = new Set(completedLessons);
+                         next.add(lessonKey);
+                         setCompletedLessons(next);
+                         if (codeProgressKey) localStorage.setItem(codeProgressKey, JSON.stringify([...next]));
+                         claimEvent(`code_lesson_complete:${activeLang}:${activePart}`, 15);
+                       }
+                     }}
+                     className={`px-10 h-14 rounded-2xl font-black text-[10px] tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all ${
+                       completedLessons.has(`${activeLang}:${activePart}`)
+                         ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 cursor-default"
+                         : "bg-cyan-500 text-neutral-950"
+                     }`}
+                   >
+                     {completedLessons.has(`${activeLang}:${activePart}`) ? "✓ CONCLUÍDO" : `CONCLUIR MÓDULO 0${activePart + 1}`}
                    </button>
                  </div>
               </div>
@@ -2439,6 +3754,7 @@ function ProvasView({ progress, onComplete }: {
 }) {
   const [activeTrilha, setActiveTrilha] = useState<Trilha | null>(null);
   const [activeModulo, setActiveModulo] = useState<Modulo>("basico");
+  const [moduloPanelOpen, setModuloPanelOpen] = useState(false);
 
   const moduloIcons: Record<Modulo, any> = {
     basico: Layers,
@@ -2484,35 +3800,63 @@ function ProvasView({ progress, onComplete }: {
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-20">
-      {/* Header */}
-      <div className="text-center space-y-4">
-        <h2 className="text-5xl font-black tracking-tighter uppercase">CENTRO DE <span className="text-cyan-400">CERTIFICAÇÃO</span></h2>
-        <p className="text-neutral-500 font-medium max-w-2xl mx-auto">3 módulos de dificuldade crescente, cada um com 3 trilhas de 30 questões. Cada questão exibe a explicação após responder.</p>
-      </div>
+      {/* Header com seta ao lado do título */}
+      <div className="text-center space-y-3">
+        <div className="flex items-center justify-center gap-3 relative">
+          <h2 className="text-5xl font-black tracking-tighter uppercase">
+            CENTRO DE <span className="text-cyan-400">CERTIFICAÇÃO</span>
+          </h2>
 
-      {/* Módulo selector */}
-      <div className="flex justify-center">
-        <div className="bg-neutral-900 border border-white/5 p-1.5 rounded-[2rem] flex gap-2">
-          {(["basico", "intermediario", "pro"] as Modulo[]).map(m => {
-            const MIcon = moduloIcons[m];
-            const isActive = activeModulo === m;
-            const colorMap: Record<Modulo, string> = {
-              basico: isActive ? "bg-cyan-500 text-neutral-950" : "text-neutral-500 hover:text-cyan-400",
-              intermediario: isActive ? "bg-amber-500 text-neutral-950" : "text-neutral-500 hover:text-amber-400",
-              pro: isActive ? "bg-red-500 text-neutral-950" : "text-neutral-500 hover:text-red-400",
-            };
-            return (
-              <button
-                key={m}
-                onClick={() => setActiveModulo(m)}
-                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${colorMap[m]} ${isActive ? "shadow-xl scale-105" : ""}`}
-              >
-                <MIcon className="w-3.5 h-3.5" />
-                {m === "basico" ? "Módulo 1 — Básico" : m === "intermediario" ? "Módulo 2 — Intermediário" : "Módulo 3 — Pro"}
-              </button>
-            );
-          })}
+          {/* Seta ao lado do título */}
+          <div className="relative">
+            <button
+              onClick={() => setModuloPanelOpen(o => !o)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border font-black text-[10px] uppercase tracking-widest transition-all ${
+                moduloPanelOpen
+                  ? "bg-cyan-500 text-neutral-950 border-cyan-500 shadow-lg shadow-cyan-500/20"
+                  : "bg-neutral-900 border-white/5 text-neutral-400 hover:border-cyan-500/40 hover:text-white"
+              }`}
+              title="Selecionar módulo"
+            >
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-300 ${moduloPanelOpen ? "rotate-90" : ""}`} />
+              <span className="text-[9px]">
+                {activeModulo === "basico" ? "Básico" : activeModulo === "intermediario" ? "Inter." : "Pro"}
+              </span>
+            </button>
+
+            {/* Dropdown de módulos — abre abaixo do botão */}
+            <AnimatePresence>
+              {moduloPanelOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.18 }}
+                  className="absolute right-0 top-12 z-30 bg-neutral-900 border border-white/10 rounded-[1.5rem] p-3 shadow-2xl shadow-black/60 min-w-[230px] space-y-2"
+                >
+                  <p className="text-[8px] font-black text-neutral-600 uppercase tracking-[0.2em] px-2 pb-1">MÓDULOS</p>
+                  {(["basico", "intermediario", "pro"] as Modulo[]).map(m => {
+                    const MIcon = moduloIcons[m];
+                    const isActive = activeModulo === m;
+                    const colorClass = {
+                      basico: isActive ? "bg-cyan-500 text-neutral-950 shadow-lg shadow-cyan-500/20" : "text-neutral-400 hover:bg-white/5 hover:text-cyan-400",
+                      intermediario: isActive ? "bg-amber-500 text-neutral-950 shadow-lg shadow-amber-500/20" : "text-neutral-400 hover:bg-white/5 hover:text-amber-400",
+                      pro: isActive ? "bg-red-500 text-white shadow-lg shadow-red-500/20" : "text-neutral-400 hover:bg-white/5 hover:text-red-400",
+                    }[m];
+                    return (
+                      <button key={m} onClick={() => { setActiveModulo(m); setModuloPanelOpen(false); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${colorClass}`}>
+                        <MIcon className="w-4 h-4" />
+                        {m === "basico" ? "Módulo 1 — Básico" : m === "intermediario" ? "Módulo 2 — Intermediário" : "Módulo 3 — Pro"}
+                      </button>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
+        <p className="text-neutral-500 font-medium max-w-xl mx-auto text-sm">3 módulos de dificuldade crescente · cada um com 3 trilhas de 30 questões</p>
       </div>
 
       {/* Barra de progresso do módulo */}
@@ -2607,10 +3951,19 @@ function ProvasView({ progress, onComplete }: {
   );
 }
 
-function ProjectsView() {
+function ProjectsView({ onGoToCircuit }: { onGoToCircuit?: (board: HardwareItem | null, comps: HardwareItem[], code?: string, title?: string) => void }) {
   const [selectedBoard, setSelectedBoard] = useState<HardwareItem | null>(null);
+  const [boardPanelOpen, setBoardPanelOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<number>(2); // Default to 2 components
+
+  // Resolve nomes de componentes para HardwareItems
+  const allHardware = [...DATA_PLACAS, ...DATA_COMPONENTES, ...DATA_PC_HARDWARE];
+  const resolveComponents = (names: string[]): HardwareItem[] =>
+    names.map(name =>
+      allHardware.find(h => h.nome.toLowerCase().includes(name.toLowerCase().substring(0, 8))) ||
+      allHardware.find(h => name.toLowerCase().includes(h.nome.toLowerCase().substring(0, 8)))
+    ).filter(Boolean) as HardwareItem[];
 
   const filteredProjects = PROJECTS.filter(p => {
     if (activeTab === 6) return p.compCount >= 6;
@@ -2625,73 +3978,77 @@ function ProjectsView() {
     { count: 6, label: "SUPER (6+)" }
   ];
 
-  if (!selectedBoard) {
-    return (
-      <div className="max-w-7xl mx-auto space-y-12 pb-40">
-        <div className="text-center space-y-4">
-          <h2 className="text-5xl font-black tracking-tighter uppercase whitespace-pre-wrap">SELECIONE SUA <span className="text-cyan-400">PLACA</span></h2>
-          <p className="text-neutral-500 font-medium">Escolha o controlador CORE do projeto para sincronizar o kernel.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {DATA_PLACAS.map((placa) => (
-            <motion.div 
-              key={placa.id}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              whileHover={{ scale: 1.02 }}
-              onClick={() => setSelectedBoard(placa)}
-              className="group cursor-pointer"
-            >
-              <div className="bg-neutral-900 border border-white/5 rounded-[4rem] p-10 h-full flex flex-col items-center text-center space-y-8 group-hover:border-cyan-500/30 transition-all shadow-2xl">
-                <div className="w-48 h-48 rounded-[2.5rem] bg-neutral-950 border border-white/5 overflow-hidden flex items-center justify-center p-6 shadow-inner">
-                   <img src={placa.image} className="w-full h-full object-contain grayscale group-hover:grayscale-0 group-hover:scale-110 transition-all duration-500" />
-                </div>
-                <div>
-                   <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">{placa.nome}</h3>
-                   <span className="px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-[9px] font-black uppercase tracking-widest text-cyan-400">
-                     SYSTEM {placa.tipo.toUpperCase()}
-                   </span>
-                </div>
-                <p className="text-neutral-500 text-xs font-medium leading-relaxed line-clamp-3">
-                  {placa.resumo || placa.info}
-                </p>
-                <div className="w-full pt-8 border-t border-white/5">
-                   <button className="w-full h-14 bg-white/5 border border-white/10 rounded-3xl text-[10px] font-black uppercase tracking-widest group-hover:bg-white group-hover:text-black transition-all">
-                     SELECIONAR CORE
-                   </button>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-7xl mx-auto space-y-12 pb-40">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-8 bg-neutral-900/40 p-8 rounded-[3rem] border border-white/5">
-         <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-neutral-950 border border-white/5 rounded-2xl flex items-center justify-center p-3">
-               <img src={selectedBoard.image} className="w-full h-full object-contain grayscale" />
-            </div>
-            <div>
-               <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1">PLACA SELECIONADA</h4>
-               <h2 className="text-2xl font-black text-white uppercase tracking-tighter">{selectedBoard.nome}</h2>
-            </div>
-         </div>
-         <button 
-           onClick={() => setSelectedBoard(null)}
-           className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
-         >
-           ALTERAR CONTROLADOR
-         </button>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-10 pb-40">
 
-      <div className="text-center space-y-4">
-        <h2 className="text-5xl font-black tracking-tighter uppercase">PROJETOS <span className="text-cyan-400">PRONTOS</span></h2>
-        <p className="text-neutral-500 font-medium">Selecione uma categoria por complexidade de hardware.</p>
+      {/* Header com seta ao lado do título */}
+      <div className="text-center space-y-3">
+        <div className="flex items-center justify-center gap-3 relative">
+          <h2 className="text-5xl font-black tracking-tighter uppercase">
+            PROJETOS <span className="text-cyan-400">PRONTOS</span>
+          </h2>
+
+          {/* Seta ao lado do título */}
+          <div className="relative">
+            <button
+              onClick={() => setBoardPanelOpen(o => !o)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border font-black text-[10px] uppercase tracking-widest transition-all ${
+                boardPanelOpen
+                  ? "bg-cyan-500 text-neutral-950 border-cyan-500 shadow-lg shadow-cyan-500/20"
+                  : "bg-neutral-900 border-white/5 text-neutral-400 hover:border-cyan-500/40 hover:text-white"
+              }`}
+              title="Selecionar placa"
+            >
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-300 ${boardPanelOpen ? "rotate-90" : ""}`} />
+              <span className="text-[9px] max-w-[80px] truncate">
+                {selectedBoard ? selectedBoard.nome.split(' ').slice(0,2).join(' ') : "Placa"}
+              </span>
+            </button>
+
+            {/* Dropdown de placas — abre abaixo do botão */}
+            <AnimatePresence>
+              {boardPanelOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.18 }}
+                  className="absolute right-0 top-12 z-30 bg-neutral-900 border border-white/10 rounded-[1.5rem] p-3 shadow-2xl shadow-black/60 min-w-[240px] space-y-1 max-h-72 overflow-y-auto scrollbar-visible"
+                >
+                  <p className="text-[8px] font-black text-neutral-600 uppercase tracking-[0.2em] px-2 pb-1">PLACA DO PROJETO</p>
+                  <button
+                    onClick={() => { setSelectedBoard(null); setBoardPanelOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                      !selectedBoard ? "bg-neutral-700 text-white" : "text-neutral-500 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <span className="text-base">🔧</span> Qualquer placa
+                  </button>
+                  {DATA_PLACAS.map(placa => (
+                    <button
+                      key={placa.id}
+                      onClick={() => { setSelectedBoard(placa); setBoardPanelOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                        selectedBoard?.id === placa.id
+                          ? "bg-cyan-500 text-neutral-950 shadow-lg shadow-cyan-500/20"
+                          : "text-neutral-400 hover:bg-white/5 hover:text-cyan-400"
+                      }`}
+                    >
+                      <img src={placa.image} className="w-7 h-7 object-contain shrink-0 grayscale" referrerPolicy="no-referrer" />
+                      <span className="truncate">{placa.nome}</span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        <p className="text-neutral-500 text-sm font-medium">
+          {selectedBoard
+            ? <><span className="text-cyan-400 font-black">{selectedBoard.nome}</span> · escolha a complexidade abaixo</>
+            : "Selecione uma placa para filtrar os projetos"}
+        </p>
       </div>
 
       {/* Internal Tabs */}
@@ -2738,7 +4095,21 @@ function ProjectsView() {
                    <div className="flex -space-x-2">
                       {[1,2,3].map(i => <div key={i} className="w-6 h-6 rounded-full bg-neutral-800 border-2 border-neutral-900" />)}
                    </div>
-                   <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-2 transition-transform" />
+                   <div className="flex items-center gap-2">
+                     {onGoToCircuit && (
+                       <button
+                         onClick={e => {
+                           e.stopPropagation();
+                           const comps = resolveComponents(proj.components);
+                           onGoToCircuit(selectedBoard, comps, proj.code, proj.title);
+                         }}
+                         className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-neutral-950 rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-emerald-500/20"
+                       >
+                         <CircuitBoard className="w-3.5 h-3.5" /> GO!
+                       </button>
+                     )}
+                     <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-2 transition-transform" />
+                   </div>
                 </div>
               </div>
             </div>
@@ -2825,12 +4196,25 @@ function ProjectsView() {
                   <pre className="bg-neutral-950 p-6 rounded-3xl border border-white/5 text-[10px] font-mono text-neutral-400 overflow-x-auto h-[600px] scrollbar-visible">
                     {selectedProject.code}
                   </pre>
-                  <button 
+                  <button
                     onClick={() => { navigator.clipboard.writeText(selectedProject.code); alert(`Código para ${selectedBoard?.nome || "V12"} Copiado!`); }}
                     className="w-full h-14 bg-white text-neutral-950 rounded-2xl font-black text-[10px] tracking-widest hover:bg-cyan-500 transition-all"
                   >
                     COPIAR CÓDIGO PARA {selectedBoard?.nome.split(' ')[0].toUpperCase() || "V12"}
                   </button>
+                  {onGoToCircuit && (
+                    <button
+                      onClick={() => {
+                        const comps = resolveComponents(selectedProject.components);
+                        setSelectedProject(null);
+                        onGoToCircuit(selectedBoard, comps, selectedProject.code, selectedProject.title);
+                      }}
+                      className="w-full h-14 bg-emerald-500 text-neutral-950 rounded-2xl font-black text-[10px] tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3"
+                    >
+                      <CircuitBoard className="w-5 h-5" />
+                      GO! — ABRIR NO CIRCUITO
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -3139,10 +4523,30 @@ function FAQView() {
   );
 }
 
-function NotebookView({ content, setContent, lastSync }: { content: string, setContent: any, lastSync: string | null }) {
+function NotebookView({ content, setContent, lastSync, onSave }: { content: string, setContent: any, lastSync: string | null, onSave: () => void }) {
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved]   = React.useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave();
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  // Ctrl+S para salvar
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); handleSave(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [content]);
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-40">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
          <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center justify-center text-cyan-400 shadow-lg">
                <StickyNote className="w-6 h-6" />
@@ -3150,11 +4554,30 @@ function NotebookView({ content, setContent, lastSync }: { content: string, setC
             <div>
                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Bloco de Notas</h3>
                <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
-                  DevGenius Personal Storage // {lastSync ? `Sincronizado: ${lastSync}` : "Não Sincronizado"}
+                  Salvo na conta · {lastSync ? `Última vez: ${lastSync}` : "Não salvo ainda"}
                   {lastSync && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
                </p>
             </div>
          </div>
+
+         {/* Botão de Salvar */}
+         <button
+           onClick={handleSave}
+           disabled={saving}
+           className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg ${
+             saved
+               ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+               : "bg-cyan-500 text-neutral-950 hover:scale-105 active:scale-95 shadow-cyan-500/20 disabled:opacity-60"
+           }`}
+         >
+           {saving ? (
+             <><span className="animate-spin">⟳</span> Salvando...</>
+           ) : saved ? (
+             <><CheckCircle2 className="w-4 h-4" /> Salvo na Conta!</>
+           ) : (
+             <><Save className="w-4 h-4" /> Salvar na Conta</>
+           )}
+         </button>
       </div>
 
       <div className="relative group">
